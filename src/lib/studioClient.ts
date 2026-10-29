@@ -40,7 +40,7 @@ export async function generateKeyArt(prompt: string, width: number, height: numb
   return firstUrl(await post({ action: 'image', prompt, width, height }))
 }
 
-export async function generateContent(topic: string, type = 'shorts'): Promise<string> {
+export async function generateContent(topic: string, type = 'shorts_script'): Promise<string> {
   const payload = await post<Record<string, unknown>>({ action: 'content', topic, type })
   for (const field of ['text', 'content', 'script', 'output'] as const) {
     const value = payload[field]

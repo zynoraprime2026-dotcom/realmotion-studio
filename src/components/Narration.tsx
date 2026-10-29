@@ -17,7 +17,7 @@ export function Narration({ title, shot, value, onChange }: NarrationProps) {
     setError('')
     setBusy(true)
     try {
-      const text = await generateContent(`${title}. This scene: ${shot}`, 'shorts')
+      const text = await generateContent(`${title}. This scene: ${shot}`, 'shorts_script')
       onChange(text.trim())
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Narration could not be drafted.')

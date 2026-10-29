@@ -90,8 +90,11 @@ export function validateProxyBody(body: unknown): Validated {
   const topic = readString(raw.topic)
   if (topic.length < 3) return { error: 'Describe the topic in at least 3 characters.' }
   if (topic.length > MAX_TOPIC) return { error: `Keep the topic under ${MAX_TOPIC} characters.` }
-  const type = readString(raw.type) || 'shorts'
-  if (type.length > 40) return { error: 'Keep the content type under 40 characters.' }
+  const CONTENT_TYPES = ['shorts_script', 'lesson', 'social_post']
+  const type = readString(raw.type) || 'shorts_script'
+  if (!CONTENT_TYPES.includes(type)) {
+    return { error: `Unsupported type "${type}". Use one of: ${CONTENT_TYPES.join(', ')}.` }
+  }
   return { action: 'content', payload: { type, topic } }
 }
 
