@@ -3,11 +3,17 @@
 export type StudioError = { message: string }
 
 async function post<T>(body: Record<string, unknown>): Promise<T> {
-  const response = await fetch('/api/studio', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  let response: Response
+  try {
+    response = await fetch('/api/studio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    // Offline, or the platform answered with something that is not a response.
+    throw new Error('Couldn\u2019t reach the studio. Check your connection and try again.')
+  }
   const payload: unknown = await response.json().catch(() => ({}))
   if (!response.ok) {
     const message =

@@ -21,6 +21,7 @@ export function KeyArt({ prompt, style, ratio, onArt, notify }: KeyArtProps) {
   const [error, setError] = useState('')
 
   const ready = prompt.trim().length >= 24
+  const hintId = 'key-art-hint'
 
   const run = async () => {
     if (!ready) {
@@ -44,11 +45,29 @@ export function KeyArt({ prompt, style, ratio, onArt, notify }: KeyArtProps) {
 
   return (
     <div className="key-art">
-      <button type="button" className="button button-ghost" onClick={run} disabled={busy || !ready}>
+      <button
+        type="button"
+        className="button button-ghost"
+        onClick={run}
+        disabled={busy || !ready}
+        aria-describedby={ready ? undefined : hintId}
+      >
         <Sparkles size={16} aria-hidden="true" />
         {busy ? 'Painting key art…' : 'Generate key art'}
       </button>
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {!ready && (
+        <p className="key-art-hint" id={hintId}>
+          Add a little story detail first: 24 characters or more unlocks key art.
+        </p>
+      )}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}{' '}
+          <button type="button" className="text-action" onClick={run} disabled={busy}>
+            Try again
+          </button>
+        </p>
+      )}
     </div>
   )
 }

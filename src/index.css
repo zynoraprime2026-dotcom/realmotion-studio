@@ -1736,3 +1736,10 @@ input:disabled {
 .key-art { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
 .key-art .button { display: inline-flex; align-items: center; gap: 8px; }
 .key-art .form-error { flex-basis: 100%; margin: 0; }
+
+.key-art-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  opacity: 0.65;
+}

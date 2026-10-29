@@ -130,6 +130,10 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
       body: JSON.stringify(validated.payload),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
+    if (!upstream.ok) {
+      // The platform log is the only place a real server fault is visible from.
+      console.warn('[studio-proxy] upstream', validated.action, 'answered', upstream.status)
+    }
     const text = await upstream.text()
     let parsed: unknown
     try {
@@ -140,6 +144,7 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
     return res.status(upstream.status).json(parsed)
   } catch (cause) {
     const timedOut = cause instanceof Error && cause.name === 'TimeoutError'
+    console.error('[studio-proxy] request failed:', timedOut ? 'timeout' : String(cause))
     return res.status(timedOut ? 504 : 502).json({
       error: timedOut ? 'The studio took too long to answer.' : 'Could not reach the studio service.',
     })
