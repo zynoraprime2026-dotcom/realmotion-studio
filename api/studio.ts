@@ -9,7 +9,7 @@ import {
   createLimiter,
   validateProxyBody,
   type StudioAction,
-} from '../src/lib/studioProxy'
+} from './_studioProxy'
 
 type MinimalRequest = {
   method?: string

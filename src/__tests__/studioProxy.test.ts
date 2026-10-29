@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clientIp, createLimiter, validateProxyBody } from '../lib/studioProxy'
+import { clientIp, createLimiter, validateProxyBody } from '../../api/_studioProxy'
 
 describe('validateProxyBody', () => {
   it('rejects an unknown action and names the allowed ones', () => {
