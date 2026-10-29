@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Check, Download, Film, Pause, Play, Save } from 'lucide-react'
 import { createScenes, type Project, type Scene, type StudioSeed } from '../data'
 import { downloadProject } from '../projectUtils'
+import { KeyArt } from './KeyArt'
 
 const examplePrompt = 'A cartographer discovers a map that redraws itself every night, leading her toward a city that was erased from history. Atmospheric mystery, vast desert landscapes, warm lantern light.'
 
@@ -94,7 +95,7 @@ export function Studio({ seed, onSave, notify }: StudioProps) {
           <p className="eyebrow dark-ink">THE DIRECTOR’S DESK</p>
           <h2>Start with a feeling.<br /><em>Leave with a film plan.</em></h2>
         </div>
-        <p className="section-summary dark-ink">Write the spark, choose the visual language, and shape every beat. This browser version creates editable storyboard briefs; no video model is connected.</p>
+        <p className="section-summary dark-ink">Write the spark, choose the visual language, and shape every beat. Storyboard briefs and treatments are generated in this browser. Key art uses the studio API when it is configured for this deployment; no video model is connected.</p>
       </div>
 
       <div className="studio-workspace page-gutter">
@@ -144,6 +145,18 @@ export function Studio({ seed, onSave, notify }: StudioProps) {
         </div>
 
         <div className="storyboard-panel" aria-live="polite">
+          <KeyArt
+            prompt={prompt}
+            style={style}
+            ratio={ratio}
+            onArt={(url) => {
+              const target = currentScene?.id
+              if (target === undefined) return
+              setScenes((current) => current.map((scene) => (scene.id === target ? { ...scene, image: url } : scene)))
+              setSaved(false)
+            }}
+            notify={notify}
+          />
           <div className="storyboard-topline">
             <span>STORYBOARD / {scenes.length.toString().padStart(2, '0')} SCENES</span>
             <span>{style.toUpperCase()} · {ratio}</span>

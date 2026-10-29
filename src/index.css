@@ -1731,3 +1731,8 @@ input:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* AI key art controls inside the storyboard panel */
+.key-art { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.key-art .button { display: inline-flex; align-items: center; gap: 8px; }
+.key-art .form-error { flex-basis: 100%; margin: 0; }

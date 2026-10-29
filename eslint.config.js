@@ -25,6 +25,11 @@ export default defineConfig([
     },
   },
   {
+    // Serverless functions run on Node, not in the browser.
+    files: ['api/**/*.ts'],
+    languageOptions: { globals: globals.node },
+  },
+  {
     // Generated shadcn/ui files are vendored, not authored here: they mix
     // component and helper exports, sync embla state in an effect, and seed a
     // skeleton width with Math.random. Keeping the upgrades clean matters more
