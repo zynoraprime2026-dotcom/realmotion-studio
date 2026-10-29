@@ -48,7 +48,7 @@ export function Hero({ onStart }: HeroProps) {
   }
 
   return (
-    <section className="hero" id="home" ref={heroRef} aria-label="RealMotion introduction">
+    <section className="hero" id="home" ref={heroRef} aria-label="Tasveer Studio introduction">
       <div className="hero-media" aria-hidden="true">
         <img src="/images/hero-portal.jpg" alt="" className="hero-poster" />
         {videoAvailable && (

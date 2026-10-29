@@ -19,11 +19,14 @@ function SectionFallback({ label }: { label: string }) {
   )
 }
 
-const STORAGE_KEY = 'realmotion-projects-v1'
+const STORAGE_KEY = 'tasveer-projects-v1'
+// Projects saved before the rename live under the old key; read through to them
+// once so a returning visitor's library does not vanish.
+const LEGACY_STORAGE_KEY = 'realmotion-projects-v1'
 
 function loadProjects(): Project[] {
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY)
+    const stored = window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!stored) return []
     const parsed: unknown = JSON.parse(stored)
     return Array.isArray(parsed) ? parsed as Project[] : []
@@ -154,7 +157,7 @@ export default function App() {
         <Brand />
         <p>Your story deserves more than a still frame.</p>
         <button type="button" className="text-action" onClick={() => document.getElementById('home')?.scrollIntoView({ behavior: 'smooth' })}>Back to top <ArrowUp size={17} /></button>
-        <span>© 2026 REALMOTION</span>
+        <span>© 2026 TASVEER STUDIO</span>
       </footer>
 
       {selectedFilm && (

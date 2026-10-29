@@ -1,4 +1,4 @@
-# RealMotion — AI Movie Studio
+# Tasveer Studio — AI Film Studio
 
 A cinematic, responsive web app for developing story ideas into editable, shot-by-shot film treatments.
 
@@ -33,6 +33,28 @@ Set it in the hosting project, never in a `VITE_` variable:
 | `STUDIO_PROXY_LIMIT` | AI requests allowed per IP per hour, default 10 |
 
 Without the key the app behaves exactly as before, as a local storyboard planner.
+
+## AI key art (optional)
+
+The studio can paint a scene with the companion [studio-api](https://studio-api-nqpm.onrender.com) service. The key never reaches the browser: `api/studio.ts` is a Vercel function that holds `STUDIO_API_KEY` server-side and forwards only two actions.
+
+| Variable | Required | Effect when missing |
+|---|---|---|
+| `STUDIO_API_KEY` | for AI artwork | `/api/studio` answers 503 and the app stays a local storyboard planner |
+| `STUDIO_API_URL` | no | defaults to `https://studio-api-nqpm.onrender.com` |
+| `STUDIO_PROXY_LIMIT` | no | 10 AI requests per IP per hour |
+
+Allowed actions are `image` (prompt, clamped width and height) and `content` (topic, type). Video rendering is deliberately not wired: a movie render costs 20 credits and minutes of Replicate time, so it needs a gate before it can face the public.
+
+Set these in the Vercel project (never with a `VITE_` prefix, which would inline them into the public bundle), then redeploy.
+
+## Checks
+
+```bash
+npm run lint
+npm test
+npm run build
+```
 
 ## Run
 

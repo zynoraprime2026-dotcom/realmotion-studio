@@ -19,7 +19,7 @@ const project: Project = {
 describe('buildBrief', () => {
   it('includes the header, metadata and every scene', () => {
     const brief = buildBrief(project)
-    expect(brief).toContain('REALMOTION — FILM TREATMENT')
+    expect(brief).toContain('TASVEER STUDIO — FILM TREATMENT')
     expect(brief).toContain('THE LAST SIGNAL')
     expect(brief).toContain('Style: Cinematic')
     expect(brief).toContain('Frame: 16:9')
@@ -57,6 +57,6 @@ describe('treatmentFileName', () => {
   })
 
   it('falls back when the title has no usable characters', () => {
-    expect(treatmentFileName({ ...project, title: 'حوار' })).toBe('realmotion-film-treatment.txt')
+    expect(treatmentFileName({ ...project, title: 'حوار' })).toBe('tasveer-film-treatment.txt')
   })
 })

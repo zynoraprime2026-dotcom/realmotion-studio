@@ -5,7 +5,7 @@ export function buildBrief(project: Project): string {
     .map((scene) => `SCENE ${scene.id} — ${scene.title.toUpperCase()} (${scene.duration}s)\n${scene.shot}`)
     .join('\n\n')
   return [
-    'REALMOTION — FILM TREATMENT',
+    'TASVEER STUDIO — FILM TREATMENT',
     '===========================',
     project.title.toUpperCase(),
     '',
@@ -30,7 +30,7 @@ export function treatmentFileName(project: Project): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-  return `${slug || 'realmotion-film'}-treatment.txt`
+  return `${slug || 'tasveer-film'}-treatment.txt`
 }
 
 export function downloadProject(project: Project) {
