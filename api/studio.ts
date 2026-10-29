@@ -14,18 +14,25 @@ type MinimalResponse = {
   setHeader: (name: string, value: string) => void
 }
 
-const ALLOWED_ACTIONS = ['image', 'content'] as const
+const ALLOWED_ACTIONS = ['image', 'content', 'animate', 'animate-status'] as const
 type StudioAction = (typeof ALLOWED_ACTIONS)[number]
+
+// Polling and reading a job must not eat the caller's hourly allowance.
+const METERED_ACTIONS: StudioAction[] = ['image', 'content', 'animate']
 
 const MIN_DIMENSION = 256
 const MAX_DIMENSION = 1536
 const MAX_PROMPT = 1200
 const MAX_TOPIC = 300
 
-const PATHS: Record<StudioAction, string> = {
+const PATHS: Record<'image' | 'content' | 'animate', string> = {
   image: '/v1/image/generate',
   content: '/v1/content/generate',
+  animate: '/v1/video/image-to-video',
 }
+
+const MAX_IMAGE_URL = 600
+const JOB_ID = /^[A-Za-z0-9-]{8,64}$/
 
 type Validated =
   | { action: StudioAction; payload: Record<string, string | number> }
@@ -58,6 +65,22 @@ export function validateProxyBody(body: unknown): Validated {
       action: 'image',
       payload: { prompt, width: clampDimension(raw.width, 1024), height: clampDimension(raw.height, 1536) },
     }
+  }
+
+  if (action === 'animate') {
+    const imageUrl = readString(raw.image_url)
+    if (!/^https:\/\//.test(imageUrl)) return { error: 'A https image_url is required to animate a still.' }
+    if (imageUrl.length > MAX_IMAGE_URL) return { error: 'That image URL is too long.' }
+    const prompt = readString(raw.prompt)
+    if (prompt.length > MAX_PROMPT) return { error: `Keep the prompt under ${MAX_PROMPT} characters.` }
+    const duration = Math.min(10, Math.max(2, Math.round(Number(raw.duration) || 5)))
+    return { action: 'animate', payload: { image_url: imageUrl, prompt, duration } }
+  }
+
+  if (action === 'animate-status') {
+    const jobId = readString(raw.job_id)
+    if (!JOB_ID.test(jobId)) return { error: 'Send the job_id returned by the animate action.' }
+    return { action: 'animate-status', payload: { job_id: jobId } }
   }
 
   const topic = readString(raw.topic)
@@ -119,17 +142,23 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
     const validated = validateProxyBody(req.body)
     if ('error' in validated) return res.status(400).json({ error: validated.error })
 
-    if (limiter.isLimited(clientIp(req.headers))) {
+    const metered = METERED_ACTIONS.includes(validated.action)
+    if (metered && limiter.isLimited(clientIp(req.headers))) {
       return res.status(429).json({ error: `Limit reached: ${PER_HOUR} AI requests per hour. Try again later.` })
     }
 
     const upstreamBase = (process.env.STUDIO_API_URL || 'https://studio-api-nqpm.onrender.com').replace(/\/+$/, '')
-    const upstream = await fetch(upstreamBase + PATHS[validated.action], {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': key },
-      body: JSON.stringify(validated.payload),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
+    const upstream = validated.action === 'animate-status'
+      ? await fetch(`${upstreamBase}/v1/video/status/${(validated.payload as Record<string, string>).job_id}`, {
+          headers: { 'x-api-key': key },
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        })
+      : await fetch(upstreamBase + PATHS[validated.action], {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+          body: JSON.stringify(validated.payload),
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        })
     if (!upstream.ok) {
       // The platform log is the only place a real server fault is visible from.
       console.warn('[studio-proxy] upstream', validated.action, 'answered', upstream.status)
@@ -140,6 +169,14 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
       parsed = JSON.parse(text)
     } catch {
       parsed = { error: text.slice(0, 300) }
+    }
+    if (validated.action === 'animate-status' && parsed && typeof parsed === 'object') {
+      const job = parsed as Record<string, unknown>
+      // /v1/video/file/:id needs the API key, so hand the browser the public copy.
+      if (job.status === 'done' && typeof job.video_url === 'string') {
+        const id = job.video_url.split('/').pop()
+        job.video_url = `${upstreamBase}/media/video/${id}`
+      }
     }
     return res.status(upstream.status).json(parsed)
   } catch (cause) {

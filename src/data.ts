@@ -16,6 +16,10 @@ export type Scene = {
   shot: string
   duration: number
   image: string
+  /** 5s animated clip, when the scene has been animated. */
+  video?: string
+  /** Draft voice-over, generated from the shot direction. */
+  narration?: string
 }
 
 export type Project = {

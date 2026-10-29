@@ -3,6 +3,8 @@ import { ArrowRight, Check, Download, Film, Pause, Play, Save } from 'lucide-rea
 import { createScenes, type Project, type Scene, type StudioSeed } from '../data'
 import { downloadProject } from '../projectUtils'
 import { KeyArt } from './KeyArt'
+import { Animate } from './Animate'
+import { Narration } from './Narration'
 
 const examplePrompt = 'A cartographer discovers a map that redraws itself every night, leading her toward a city that was erased from history. Atmospheric mystery, vast desert landscapes, warm lantern light.'
 
@@ -70,6 +72,11 @@ export function Studio({ seed, onSave, notify }: StudioProps) {
 
   const updateScene = (id: number, shot: string) => {
     setScenes((current) => current.map((scene) => scene.id === id ? { ...scene, shot } : scene))
+    setSaved(false)
+  }
+
+  const patchScene = (id: number, patch: Partial<Scene>) => {
+    setScenes((current) => current.map((scene) => scene.id === id ? { ...scene, ...patch } : scene))
     setSaved(false)
   }
 
@@ -169,7 +176,19 @@ export function Studio({ seed, onSave, notify }: StudioProps) {
           ) : currentScene ? (
             <>
               <div className={`storyboard-screen frame-${ratio.replace(':', '-')}`}>
-                <img key={currentScene.id} src={currentScene.image} alt={`Visual direction for scene ${currentScene.id}`} />
+                {currentScene.video ? (
+                  <video
+                    key={currentScene.video}
+                    src={currentScene.video}
+                    poster={currentScene.image}
+                    controls
+                    playsInline
+                    loop
+                    muted
+                  />
+                ) : (
+                  <img key={currentScene.id} src={currentScene.image} alt={`Visual direction for scene ${currentScene.id}`} />
+                )}
                 <div className="frame-corners" aria-hidden="true" />
                 <span className="preview-badge">STORYBOARD PREVIEW · NOT RENDERED FOOTAGE</span>
                 <button type="button" className="board-play" onClick={() => setPlaying((value) => !value)} aria-label={playing ? 'Pause storyboard preview' : 'Play storyboard preview'}>
@@ -188,6 +207,20 @@ export function Studio({ seed, onSave, notify }: StudioProps) {
               <div className="scene-editor">
                 <label htmlFor={`scene-${currentScene.id}`}>SCENE 0{currentScene.id} / SHOT DIRECTION</label>
                 <textarea id={`scene-${currentScene.id}`} rows={3} value={currentScene.shot} onChange={(event) => updateScene(currentScene.id, event.target.value)} />
+              </div>
+              <div className="scene-tools">
+                <Animate
+                  imageUrl={currentScene.image}
+                  prompt={currentScene.shot}
+                  onVideo={(url) => patchScene(currentScene.id, { video: url })}
+                  notify={notify}
+                />
+                <Narration
+                  title={title}
+                  shot={currentScene.shot}
+                  value={currentScene.narration ?? ''}
+                  onChange={(text) => patchScene(currentScene.id, { narration: text })}
+                />
               </div>
               <div className="storyboard-actions">
                 <button type="button" className="text-action" onClick={exportDraft}><Download size={17} /> Export treatment</button>

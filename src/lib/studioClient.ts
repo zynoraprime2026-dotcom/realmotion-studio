@@ -48,3 +48,28 @@ export async function generateContent(topic: string, type = 'shorts'): Promise<s
   }
   throw new Error('The studio answered without any text.')
 }
+
+export type VideoStatus = {
+  status: string
+  progress: number
+  videoUrl: string | null
+  error: string | null
+}
+
+/** Hands a still to the studio and returns the job id to poll. */
+export async function animateScene(imageUrl: string, prompt: string, duration = 5): Promise<string> {
+  const payload = await post<Record<string, unknown>>({ action: 'animate', image_url: imageUrl, prompt, duration })
+  const jobId = payload.job_id
+  if (typeof jobId !== 'string' || !jobId) throw new Error('The studio did not return an animation job.')
+  return jobId
+}
+
+export async function videoStatus(jobId: string): Promise<VideoStatus> {
+  const payload = await post<Record<string, unknown>>({ action: 'animate-status', job_id: jobId })
+  return {
+    status: typeof payload.status === 'string' ? payload.status : 'unknown',
+    progress: typeof payload.progress === 'number' ? payload.progress : 0,
+    videoUrl: typeof payload.video_url === 'string' ? payload.video_url : null,
+    error: typeof payload.error === 'string' ? payload.error : null,
+  }
+}

@@ -58,3 +58,24 @@ describe('clientIp', () => {
     expect(clientIp({})).toBe('unknown')
   })
 })
+
+describe('validateProxyBody: animation', () => {
+  it('requires an https image to animate', () => {
+    const result = validateProxyBody({ action: 'animate', image_url: 'http://insecure.example/a.jpg' })
+    expect(result).toHaveProperty('error')
+  })
+
+  it('defaults to a 5 second clip and never exceeds the provider ceiling', () => {
+    const base = { action: 'animate', image_url: 'https://example.com/a.jpg', prompt: 'slow push in' }
+    expect(validateProxyBody(base)).toMatchObject({ payload: { duration: 5 } })
+    expect(validateProxyBody({ ...base, duration: 30 })).toMatchObject({ payload: { duration: 10 } })
+    expect(validateProxyBody({ ...base, duration: 1 })).toMatchObject({ payload: { duration: 2 } })
+  })
+
+  it('only accepts a plausible job id when polling', () => {
+    expect(validateProxyBody({ action: 'animate-status', job_id: '../../etc/passwd' })).toHaveProperty('error')
+    const ok = validateProxyBody({ action: 'animate-status', job_id: '0d1f5a3e-2b44-4c19-9f0a-77a1b2c3d4e5' })
+    expect(ok).toMatchObject({ action: 'animate-status' })
+  })
+})
+
