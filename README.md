@@ -17,6 +17,23 @@ A cinematic, responsive web app for developing story ideas into editable, shot-b
 
 This version is frontend-only. It creates storyboard briefs, not rendered AI video, and does not claim to call a video model. Projects are stored in this browser's localStorage; they do not sync across devices and are removed if site data is cleared.
 
+## AI key art (optional)
+
+With `STUDIO_API_KEY` set, the studio can paint concept art for the active scene.
+The browser never sees that key: it posts to `/api/studio`, a serverless function
+that attaches the key and forwards only two endpoints, `/v1/image/generate` and
+`/v1/content/generate`. Video rendering is deliberately not wired.
+
+Set it in the hosting project, never in a `VITE_` variable:
+
+| Variable | Purpose |
+|---|---|
+| `STUDIO_API_URL` | defaults to the Render deployment of studio-api |
+| `STUDIO_API_KEY` | required to enable key art; the function returns 503 without it |
+| `STUDIO_PROXY_LIMIT` | AI requests allowed per IP per hour, default 10 |
+
+Without the key the app behaves exactly as before, as a local storyboard planner.
+
 ## Run
 
 ```bash
