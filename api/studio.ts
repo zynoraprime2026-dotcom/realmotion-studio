@@ -2,9 +2,12 @@
 // Node runtime is happiest with a single file per function, and every cross-file
 // import here previously failed at load time with FUNCTION_INVOCATION_FAILED.
 
+import { Readable } from 'node:stream'
+
 type MinimalRequest = {
   method?: string
   body?: unknown
+  query?: Record<string, string | string[] | undefined>
   headers: Record<string, string | string[] | undefined>
 }
 
@@ -12,6 +15,7 @@ type MinimalResponse = {
   status: (code: number) => MinimalResponse
   json: (body: unknown) => void
   setHeader: (name: string, value: string) => void
+  end?: (body?: unknown) => void
 }
 
 const ALLOWED_ACTIONS = ['image', 'content', 'animate', 'animate-status'] as const
@@ -126,6 +130,27 @@ const limiter = createLimiter(PER_HOUR, 60 * 60 * 1000)
 
 export default async function handler(req: MinimalRequest, res: MinimalResponse) {
   try {
+    const query = req.query ?? {}
+    const queryAction = readString(Array.isArray(query.action) ? query.action[0] : query.action)
+
+    // A browser <video> can only issue GET, so a finished clip is streamed here.
+    if (req.method === 'GET' && queryAction === 'video') {
+      const key = process.env.STUDIO_API_KEY
+      if (!key) return res.status(503).json({ error: 'AI artwork is not switched on for this deployment yet.' })
+      const jobId = readString(Array.isArray(query.job_id) ? query.job_id[0] : query.job_id)
+      if (!JOB_ID.test(jobId)) return res.status(400).json({ error: 'Unknown clip.' })
+      const base = (process.env.STUDIO_API_URL || 'https://studio-api-nqpm.onrender.com').replace(/\/+$/, '')
+      const upstream = await fetch(`${base}/v1/video/file/${jobId}`, {
+        headers: { 'x-api-key': key },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      if (!upstream.ok || !upstream.body) return res.status(upstream.status === 200 ? 502 : upstream.status).json({ error: 'That clip is not ready.' })
+      res.setHeader('Content-Type', upstream.headers.get('content-type') || 'video/mp4')
+      res.setHeader('Cache-Control', 'public, max-age=3600')
+      Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res as unknown as NodeJS.WritableStream)
+      return
+    }
+
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST')
       return res.status(405).json({ error: 'Use POST.' })
@@ -175,7 +200,8 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
       // /v1/video/file/:id needs the API key, so hand the browser the public copy.
       if (job.status === 'done' && typeof job.video_url === 'string') {
         const id = job.video_url.split('/').pop()
-        job.video_url = `${upstreamBase}/media/video/${id}`
+        // Streamed through this function so the browser never needs the API key.
+        job.video_url = `/api/studio?action=video&job_id=${id}`
       }
     }
     return res.status(upstream.status).json(parsed)
