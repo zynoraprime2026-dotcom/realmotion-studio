@@ -1,0 +1,4 @@
+{
+  "type": "commonjs",
+  "comment": "Vercel's Node launcher expects CommonJS handlers; the app itself stays ESM."
+}
