@@ -1,12 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowUp, Check, Menu, X } from 'lucide-react'
 import { Brand } from './components/Brand'
 import { Hero } from './components/Hero'
 import { Studio } from './components/Studio'
-import { Explore } from './components/Explore'
-import { MyFilms } from './components/MyFilms'
-import { FilmModal } from './components/FilmModal'
 import type { Film, Project, StudioSeed } from './data'
+
+// Below-the-fold sections and the modal load on demand, so the first paint only
+// carries the hero and the studio instead of the whole collection.
+const Explore = lazy(() => import('./components/Explore').then((m) => ({ default: m.Explore })))
+const MyFilms = lazy(() => import('./components/MyFilms').then((m) => ({ default: m.MyFilms })))
+const FilmModal = lazy(() => import('./components/FilmModal').then((m) => ({ default: m.FilmModal })))
+
+function SectionFallback({ label }: { label: string }) {
+  return (
+    <div className="page-gutter" style={{ padding: '96px 0' }} role="status" aria-live="polite">
+      <span className="local-status"><i /> Loading {label}…</span>
+    </div>
+  )
+}
 
 const STORAGE_KEY = 'realmotion-projects-v1'
 
@@ -131,8 +142,12 @@ export default function App() {
       <main>
         <Hero onStart={scrollToStudio} />
         <Studio key={studioSession} seed={studioSeed} onSave={saveProject} notify={notify} />
-        <Explore onSelect={setSelectedFilm} />
-        <MyFilms projects={projects} onStart={scrollToStudio} onOpen={openProject} onDelete={deleteProject} notify={notify} />
+        <Suspense fallback={<SectionFallback label="collection" />}>
+          <Explore onSelect={setSelectedFilm} />
+        </Suspense>
+        <Suspense fallback={<SectionFallback label="your films" />}>
+          <MyFilms projects={projects} onStart={scrollToStudio} onOpen={openProject} onDelete={deleteProject} notify={notify} />
+        </Suspense>
       </main>
 
       <footer className="site-footer page-gutter">
@@ -142,7 +157,11 @@ export default function App() {
         <span>© 2026 REALMOTION</span>
       </footer>
 
-      {selectedFilm && <FilmModal film={selectedFilm} onClose={() => setSelectedFilm(null)} onUse={useFilm} />}
+      {selectedFilm && (
+        <Suspense fallback={null}>
+          <FilmModal film={selectedFilm} onClose={() => setSelectedFilm(null)} onUse={useFilm} />
+        </Suspense>
+      )}
       <div className={`toast ${toast ? 'toast-visible' : ''}`} role="status" aria-live="polite">
         <Check size={17} /> {toast}
       </div>
