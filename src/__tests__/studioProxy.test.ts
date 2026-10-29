@@ -29,7 +29,7 @@ describe('validateProxyBody', () => {
   it('defaults the content type and rejects an empty topic', () => {
     expect(validateProxyBody({ action: 'content', topic: 'a map that redraws itself' })).toEqual({
       action: 'content',
-      payload: { type: 'shorts', topic: 'a map that redraws itself' },
+      payload: { type: 'shorts_script', topic: 'a map that redraws itself' },
     })
     expect(validateProxyBody({ action: 'content', topic: '' })).toHaveProperty('error')
   })
