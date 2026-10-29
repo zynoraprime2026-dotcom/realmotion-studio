@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/studio.ts": {
+      "maxDuration": 60
+    }
+  }
+}

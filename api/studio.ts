@@ -97,7 +97,8 @@ export function clientIp(headers: Record<string, string | string[] | undefined>)
 }
 
 const PER_HOUR = Number(process.env.STUDIO_PROXY_LIMIT) || 10
-const TIMEOUT_MS = 30_000
+// Render's free tier can take ~40s to wake, so give the studio real room.
+const TIMEOUT_MS = 55_000
 const limiter = createLimiter(PER_HOUR, 60 * 60 * 1000)
 
 export default async function handler(req: MinimalRequest, res: MinimalResponse) {
