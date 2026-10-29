@@ -25,3 +25,8 @@ dist-ssr
 
 # local backup of the original lockfile
 package-lock.json.orig
+
+# local secrets (STUDIO_API_KEY etc.)
+.env
+.env.*
+!.env.example

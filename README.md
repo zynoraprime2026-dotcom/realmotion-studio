@@ -73,3 +73,30 @@ npm run preview
 ## Visual system
 
 React, TypeScript, Vite, Manrope, Instrument Serif, Lucide icons, custom CSS, and locally bundled cinematic artwork. The hero MP4 is a locally produced motion study from the hero artwork, so playback has no external runtime dependency.
+
+## Run it on your laptop
+
+Needs Node 20 or newer and Git.
+
+```bash
+git clone https://github.com/zynoraprime2026-dotcom/tasveer-studio.git
+cd tasveer-studio
+npm install
+cp .env.example .env.local     # then paste your STUDIO_API_KEY into it
+npm run dev                    # http://localhost:5173
+```
+
+`npm run dev` gives you the app, but key art needs the proxy, which only runs on
+Vercel or another Node host. Two options:
+
+- `npx vercel dev` instead of `npm run dev` runs the app *and* `api/studio.ts`
+  locally, which is the closest match to production.
+- Point `STUDIO_API_URL` at a studio-api you run yourself
+  (`git clone https://github.com/zynoraprime2026-dotcom/studio-api`, `npm install`,
+  `node server.js`, port 3000) and keep using `npm run dev`.
+
+The key must never carry a `VITE_` prefix. Anything starting with `VITE_` is
+compiled into the public bundle, which would hand your studio-api credits to
+anyone who views the page.
+
+Other scripts: `npm run build`, `npm run lint`, `npm test`.
