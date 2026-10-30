@@ -9,6 +9,7 @@ import {
   cutVertical,
   getUsage,
   listSeries,
+  suggestSeries,
   draftMovie,
   filmAssetUrl,
   filmUrl,
@@ -21,6 +22,7 @@ import {
   type FilmPackage,
   type FilmQuality,
   type FilmSeries,
+  type SeriesSuggestion,
   type StudioUsage,
   type MovieDraft,
   type MovieDraftScene,
@@ -82,6 +84,8 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const [bibleName, setBibleName] = useState('')
   const [bibleText, setBibleText] = useState('')
   const [bibleBusy, setBibleBusy] = useState(false)
+  const [bibleIdeas, setBibleIdeas] = useState<SeriesSuggestion[]>([])
+  const [suggestBusy, setSuggestBusy] = useState(false)
 
   const refreshLibrary = useCallback(() => {
     listMovies()
@@ -201,6 +205,25 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const costs = usage?.movie_costs ?? { storyboard: 4, standard: 20, high: 30 }
   const renderCost = costs[quality]
   const shortOnUses = usage !== null && usage.remaining < renderCost
+
+  const askForSuggestions = async () => {
+    setSuggestBusy(true)
+    setError('')
+    try {
+      const list = await suggestSeries(bibleName.trim(), bibleText.trim())
+      setBibleIdeas(list)
+      if (!list.length) setError('The studio had nothing to add. Your bible may already cover it.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Suggestions could not be fetched.')
+    } finally {
+      setSuggestBusy(false)
+    }
+  }
+
+  const acceptSuggestion = (suggestion: SeriesSuggestion) => {
+    setBibleText((current) => (current.trim() ? `${current.trim()}\n\n${suggestion.text}` : suggestion.text))
+    setBibleIdeas((current) => current.filter((entry) => entry.text !== suggestion.text))
+  }
 
   const saveBible = async () => {
     if (bibleName.trim().length < 2) {
@@ -450,6 +473,22 @@ export function Director({ notify, onFilms }: DirectorProps) {
                   <div className="series-form">
                     <input className="series-input" placeholder="Series name" value={bibleName} onChange={(event) => setBibleName(event.target.value)} aria-label="Series name" />
                     <textarea className="series-input" rows={3} placeholder="The look, the cast, the rules those films must obey" value={bibleText} onChange={(event) => setBibleText(event.target.value)} aria-label="Series bible" />
+                    <button type="button" className="text-action" onClick={() => void askForSuggestions()} disabled={suggestBusy} aria-live="polite">
+                      {suggestBusy ? 'Reading your bible…' : bibleIdeas.length ? 'Suggest something else' : 'AI suggestions · free'}
+                    </button>
+                    {bibleIdeas.length > 0 && (
+                      <ul className="suggestion-list">
+                        {bibleIdeas.map((suggestion) => (
+                          <li key={suggestion.text}>
+                            <button type="button" className="suggestion-card" onClick={() => acceptSuggestion(suggestion)}>
+                              <span className="suggestion-label">{suggestion.label}</span>
+                              <span className="suggestion-text">{suggestion.text}</span>
+                              <span className="suggestion-add">Tap to add</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     <button type="button" className="chip" onClick={() => void saveBible()} disabled={bibleBusy}>
                       {bibleBusy ? 'Saving…' : 'Save series'}
                     </button>
