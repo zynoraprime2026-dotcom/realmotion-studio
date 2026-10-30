@@ -2004,3 +2004,16 @@ input:disabled {
 @media (max-width: 900px) {
   .director-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* the deliverable package under a finished film */
+.director-delivery { margin-top: 28px; border-top: 1px solid rgba(243, 236, 218, 0.14); padding-top: 22px; }
+.director-delivery h3 { font-size: 1.05rem; margin-bottom: 12px; }
+.director-cast { color: #8FB3B0; font-size: 0.9rem; margin-bottom: 16px; }
+.delivery-grid { display: grid; gap: 20px; grid-template-columns: 160px 1fr; align-items: start; }
+.delivery-poster { display: block; text-decoration: none; color: inherit; }
+.delivery-poster img { width: 100%; border-radius: 10px; display: block; border: 1px solid rgba(243, 236, 218, 0.18); }
+.delivery-poster span { display: block; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8FB3B0; margin-top: 6px; }
+.delivery-links { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.delivery-links a { color: #F3ECDA; text-decoration: none; border-bottom: 1px solid rgba(243, 236, 218, 0.35); padding-bottom: 2px; font-size: 0.95rem; }
+.delivery-links a:hover { border-color: #F3ECDA; }
+@media (max-width: 640px) { .delivery-grid { grid-template-columns: 1fr; } .delivery-poster { max-width: 200px; } }

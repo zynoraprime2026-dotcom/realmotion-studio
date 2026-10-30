@@ -255,4 +255,39 @@ export async function listMovies(): Promise<MovieSummary[]> {
   return body.movies ?? body.items ?? []
 }
 
+export type CastMember = { speaker: string; lines: number; shots: string[] }
+
+export type FilmPackage = {
+  id: string
+  title: string
+  status: string
+  language: string | null
+  aspectRatio: string | null
+  shots: number
+  cast: CastMember[]
+  deliverables: Record<string, string | null>
+}
+
+/** Who actually speaks in the cut, so a viewer knows the cast. */
+export async function getFilmCast(movieId: string): Promise<CastMember[]> {
+  const body = await post<{ cast?: CastMember[] }>({ action: 'movie-cast', movie_id: movieId })
+  return body.cast ?? []
+}
+
+/** Every deliverable in one call: cast, deliverables, poster availability. */
+export async function getFilmPackage(movieId: string): Promise<FilmPackage> {
+  return post<FilmPackage>({ action: 'movie-package', movie_id: movieId })
+}
+
+/** Portrait key art built from the film's own title, style and lead prompt. */
+export async function generateFilmPoster(movieId: string): Promise<{ poster: string }> {
+  return post<{ poster: string }>({ action: 'movie-poster', movie_id: movieId })
+}
+
+export type FilmAsset = 'script' | 'shotlist' | 'subtitles' | 'poster'
+
+export function filmAssetUrl(movieId: string, asset: FilmAsset): string {
+  return `/api/studio?action=movie-asset&movie_id=${encodeURIComponent(movieId)}&asset=${asset}`
+}
+
 export const ACTIVE_MOVIE_STATUSES = ['queued', 'scripting', 'processing', 'assembling']

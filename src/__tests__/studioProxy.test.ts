@@ -89,3 +89,25 @@ describe('validateProxyBody: the film list', () => {
     expect(upstreamPath('movie-list', {})).toBe('/v1/movie/list')
   })
 })
+
+describe('validateProxyBody: the deliverable package', () => {
+  const id = 'mov_1234abcd-0000-1111-2222-333344445555'
+
+  it('accepts cast, package and poster for a real film id', () => {
+    for (const action of ['movie-cast', 'movie-package', 'movie-poster'] as const) {
+      expect(validateProxyBody({ action, movie_id: id })).toEqual({ action, payload: { movie_id: id } })
+    }
+  })
+
+  it('refuses a film id that is not one of ours', () => {
+    for (const action of ['movie-cast', 'movie-package', 'movie-poster'] as const) {
+      expect(validateProxyBody({ action, movie_id: '../../etc/passwd' })).toHaveProperty('error')
+    }
+  })
+
+  it('maps each one onto its upstream route', () => {
+    expect(upstreamPath('movie-cast', { movie_id: id })).toBe(`/v1/movie/${id}/cast`)
+    expect(upstreamPath('movie-package', { movie_id: id })).toBe(`/v1/movie/${id}/package`)
+    expect(upstreamPath('movie-poster', { movie_id: id })).toBe(`/v1/movie/${id}/poster`)
+  })
+})
