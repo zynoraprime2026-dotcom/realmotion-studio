@@ -10,6 +10,7 @@ import {
   getUsage,
   listSeries,
   suggestSeries,
+  updateSeries,
   draftMovie,
   filmAssetUrl,
   filmUrl,
@@ -87,7 +88,7 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const [bibleIdeas, setBibleIdeas] = useState<SeriesSuggestion[]>([])
   const [suggestBusy, setSuggestBusy] = useState(false)
   const [openIdeas, setOpenIdeas] = useState<string[]>([])
-  const [justAdded, setJustAdded] = useState<{ label: string; before: string } | null>(null)
+  const [justAdded, setJustAdded] = useState<{ label: string; before: string; idea: SeriesSuggestion; index: number } | null>(null)
   const bibleRef = useRef<HTMLTextAreaElement | null>(null)
 
   const refreshLibrary = useCallback(() => {
@@ -212,6 +213,7 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const askForSuggestions = async () => {
     setSuggestBusy(true)
     setError('')
+    setJustAdded(null)
     try {
       const list = await suggestSeries(bibleName.trim(), bibleText.trim())
       setBibleIdeas(list)
@@ -228,9 +230,10 @@ export function Director({ notify, onFilms }: DirectorProps) {
   // left wondering whether anything happened.
   const acceptSuggestion = (suggestion: SeriesSuggestion) => {
     const before = bibleText
+    const index = bibleIdeas.findIndex((entry) => entry.text === suggestion.text)
     setBibleText((current) => (current.trim() ? `${current.trim()}\n\n${suggestion.text}` : suggestion.text))
     setBibleIdeas((current) => current.filter((entry) => entry.text !== suggestion.text))
-    setJustAdded({ label: suggestion.label || 'line', before })
+    setJustAdded({ label: suggestion.label || 'line', before, idea: suggestion, index })
     requestAnimationFrame(() => {
       const field = bibleRef.current
       if (field) field.scrollTop = field.scrollHeight
@@ -240,6 +243,14 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const undoAdd = () => {
     if (!justAdded) return
     setBibleText(justAdded.before)
+    // put the suggestion back where it was, so undo costs nothing and takes nothing away
+    setBibleIdeas((current) => {
+      if (current.some((entry) => entry.text === justAdded.idea.text)) return current
+      const next = [...current]
+      const at = Math.min(Math.max(justAdded.index, 0), next.length)
+      next.splice(at, 0, justAdded.idea)
+      return next
+    })
     setJustAdded(null)
   }
 
@@ -261,12 +272,6 @@ export function Director({ notify, onFilms }: DirectorProps) {
     return Sparkles
   }
 
-  useEffect(() => {
-    if (!justAdded) return
-    const timer = window.setTimeout(() => setJustAdded(null), 8000)
-    return () => window.clearTimeout(timer)
-  }, [justAdded])
-
   const saveBible = async () => {
     if (bibleName.trim().length < 2) {
       setError('Give the series a name.')
@@ -274,7 +279,16 @@ export function Director({ notify, onFilms }: DirectorProps) {
     }
     setBibleBusy(true)
     setError('')
+    const editing = series.find((entry) => entry.id === seriesId)
     try {
+      if (editing) {
+        const updated = await updateSeries(editing.id, bibleName.trim(), bibleText.trim())
+        setSeries((current) => current.map((entry) => (entry.id === updated.id ? { ...entry, ...updated } : entry)))
+        setBibleOpen(false)
+        setJustAdded(null)
+        notify(`"${updated.name}" updated. Films already made in it keep their look.`)
+        return
+      }
       const created = await createSeries(bibleName.trim(), bibleText.trim())
       setSeries((current) => [created, ...current])
       setSeriesId(created.id)
@@ -282,6 +296,7 @@ export function Director({ notify, onFilms }: DirectorProps) {
       setBibleName('')
       setBibleText('')
       setBibleOpen(false)
+      setJustAdded(null)
       notify(`"${created.name}" saved. Every film in it keeps the same look and cast.`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That series could not be saved.')
@@ -501,15 +516,21 @@ export function Director({ notify, onFilms }: DirectorProps) {
                   className="series-select"
                   value={seriesId}
                   onChange={(event) => {
-                    setSeriesId(event.target.value)
-                    localStorage.setItem('studio.series', event.target.value)
+                    const next = event.target.value
+                    setSeriesId(next)
+                    localStorage.setItem('studio.series', next)
+                    const picked = series.find((entry) => entry.id === next)
+                    setBibleName(picked ? picked.name : '')
+                    setBibleText(picked ? picked.bible ?? '' : '')
+                    setBibleIdeas([])
+                    setJustAdded(null)
                   }}
                 >
                   <option value="">A one-off film</option>
                   {series.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
                 </select>
                 <button type="button" className="text-action" onClick={() => setBibleOpen((open) => !open)}>
-                  {bibleOpen ? 'Cancel' : 'Write a series bible'}
+                  {bibleOpen ? 'Cancel' : seriesId ? 'Edit this series bible' : 'Write a series bible'}
                 </button>
                 {bibleOpen && (
                   <div className="series-form">
@@ -567,7 +588,7 @@ export function Director({ notify, onFilms }: DirectorProps) {
                       </p>
                     )}
                     <button type="button" className="chip" onClick={() => void saveBible()} disabled={bibleBusy}>
-                      {bibleBusy ? 'Saving…' : 'Save series'}
+                      {bibleBusy ? 'Saving…' : seriesId ? 'Save changes' : 'Save series'}
                     </button>
                   </div>
                 )}

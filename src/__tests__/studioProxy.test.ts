@@ -142,6 +142,15 @@ describe('allowance and series', () => {
       .toEqual({ action: 'series-create', payload: { name: 'Zanj Cycle', bible: 'indigo and ochre' } })
   })
 
+  it('edits the series you picked instead of forking a second one', () => {
+    const seriesId = 'ser_fdcd1ed4-efdf-48c8-90b5-dc7228556ad8'
+    expect(validateProxyBody({ action: 'series-update', series_id: 'nope', name: 'A' })).toHaveProperty('error')
+    expect(validateProxyBody({ action: 'series-update', series_id: seriesId, name: 'A' })).toHaveProperty('error')
+    expect(validateProxyBody({ action: 'series-update', series_id: seriesId, name: 'Ananse Cycle', bible: 'Indigo dusk.' }))
+      .toEqual({ action: 'series-update', payload: { series_id: seriesId, name: 'Ananse Cycle', bible: 'Indigo dusk.' } })
+    expect(upstreamPath('series-update', { series_id: seriesId })).toBe(`/v1/series/${seriesId}`)
+  })
+
   it('asks for bible suggestions only once there is something to read', () => {
     expect(validateProxyBody({ action: 'series-suggestions' })).toHaveProperty('error')
     expect(validateProxyBody({ action: 'series-suggestions', bible: 'Ochre coast, indigo haze.' }))

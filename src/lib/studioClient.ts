@@ -176,6 +176,10 @@ export async function suggestSeries(name: string, bible: string): Promise<Series
   return response.suggestions ?? []
 }
 
+export async function updateSeries(seriesId: string, name: string, bible: string): Promise<FilmSeries> {
+  return post<FilmSeries>({ action: 'series-update', series_id: seriesId, name, bible })
+}
+
 export async function createSeries(name: string, bible: string): Promise<FilmSeries> {
   const created = await post<{ series_id: string; name: string; bible: string }>({ action: 'series-create', name, bible })
   return { id: created.series_id, name: created.name, bible: created.bible }

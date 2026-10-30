@@ -39,6 +39,7 @@ const ALLOWED_ACTIONS = [
   'series-list',
   'series-create',
   'series-suggestions',
+  'series-update',
 ] as const
 type StudioAction = (typeof ALLOWED_ACTIONS)[number]
 
@@ -86,7 +87,7 @@ type Validated =
 
 /** Where an action lives upstream: fixed paths, plus the movie-id routes. */
 export function upstreamPath(action: StudioAction, payload: Record<string, string | number>): string {
-  const movieId = String(payload.movie_id ?? '')
+  const movieId = String(payload.movie_id ?? payload.series_id ?? '')
   switch (action) {
     case 'movie-status':
     case 'movie-suggestions':
@@ -108,6 +109,8 @@ export function upstreamPath(action: StudioAction, payload: Record<string, strin
       return '/v1/series'
     case 'series-suggestions':
       return '/v1/series/suggestions'
+    case 'series-update':
+      return `/v1/series/${movieId}`
     case 'image':
     case 'content':
     case 'animate':
@@ -232,6 +235,17 @@ export function validateProxyBody(body: unknown): Validated {
     if (name.length > 80) return { error: 'Keep the series name under 80 characters.' }
     if (bible.length > 2000) return { error: 'Keep the series bible under 2000 characters.' }
     return { action, payload: { name, bible, prompt } }
+  }
+
+  if (action === 'series-update') {
+    const seriesId = readString(raw.series_id)
+    if (!SERIES_ID.test(seriesId)) return { error: 'Send the series_id of the bible you are editing.' }
+    const name = readString(raw.name)
+    const bible = readString(raw.bible)
+    if (name.length < 2) return { error: 'Give the series a name.' }
+    if (name.length > 80) return { error: 'Keep the series name under 80 characters.' }
+    if (bible.length > 2000) return { error: 'Keep the series bible under 2000 characters.' }
+    return { action, payload: { series_id: seriesId, name, bible } }
   }
 
   if (action === 'series-create') {
@@ -420,7 +434,7 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
           signal: AbortSignal.timeout(TIMEOUT_MS),
         })
       : await fetch(upstreamUrl, {
-          method: 'POST',
+          method: validated.action === 'series-update' ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': key },
           body: JSON.stringify(upstreamBody(validated.payload)),
           signal: AbortSignal.timeout(TIMEOUT_MS),
