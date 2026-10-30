@@ -2037,9 +2037,59 @@ input:disabled {
 .series-form { display: flex; flex-direction: column; gap: 8px; }
 
 /* what the bible is missing, offered as lines you can take */
-.suggestion-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.suggestion-card { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(243, 236, 218, 0.18); background: rgba(243, 236, 218, 0.05); color: inherit; font: inherit; cursor: pointer; transition: border-color 120ms ease, background 120ms ease; }
-.suggestion-card:hover, .suggestion-card:focus-visible { border-color: #D4F800; background: rgba(212, 248, 0, 0.08); }
-.suggestion-label { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #D4F800; }
-.suggestion-text { font-size: 0.88rem; line-height: 1.45; color: rgba(243, 236, 218, 0.86); }
-.suggestion-add { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(243, 236, 218, 0.45); }
+.suggestion-free { margin: 0; font-size: 0.74rem; letter-spacing: 0.04em; color: rgba(243, 236, 218, 0.5); }
+.suggestion-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.suggestion-item { display: block; }
+.suggestion-card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid rgba(243, 236, 218, 0.16); background: rgba(243, 236, 218, 0.04);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.suggestion-card:hover, .suggestion-card:focus-within { border-color: rgba(212, 248, 0, 0.55); background: rgba(212, 248, 0, 0.05); }
+.suggestion-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.suggestion-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px; border-radius: 999px;
+  background: rgba(212, 248, 0, 0.12); color: #D4F800;
+  font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+}
+.suggestion-dismiss {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 999px; border: 1px solid transparent;
+  background: none; color: rgba(243, 236, 218, 0.45); cursor: pointer;
+}
+.suggestion-dismiss:hover, .suggestion-dismiss:focus-visible { color: #F3ECDA; border-color: rgba(243, 236, 218, 0.25); }
+.suggestion-text {
+  margin: 0; font-size: 0.87rem; line-height: 1.5; color: rgba(243, 236, 218, 0.84);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.suggestion-text.is-open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.suggestion-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; }
+.suggestion-more {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 0.74rem; letter-spacing: 0.04em;
+  color: rgba(243, 236, 218, 0.55); text-decoration: underline; text-underline-offset: 3px;
+}
+.suggestion-more:hover { color: #F3ECDA; }
+.suggestion-add {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+  padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(212, 248, 0, 0.45); background: rgba(212, 248, 0, 0.1);
+  color: #F3ECDA; font: inherit; font-size: 0.76rem; letter-spacing: 0.06em; text-transform: uppercase;
+  transition: background 120ms ease, color 120ms ease;
+}
+.suggestion-add:hover, .suggestion-add:focus-visible { background: #D4F800; color: #10130B; border-color: #D4F800; }
+.suggestion-added {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  padding: 9px 12px; border-radius: 10px;
+  background: rgba(212, 248, 0, 0.1); border: 1px solid rgba(212, 248, 0, 0.3);
+  color: #F3ECDA; font-size: 0.82rem;
+  animation: suggestion-land 240ms ease-out;
+}
+.suggestion-undo {
+  margin-left: auto; background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 0.78rem; color: #D4F800; text-decoration: underline; text-underline-offset: 3px;
+}
+@keyframes suggestion-land { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.series-bible { scroll-behavior: smooth; }
