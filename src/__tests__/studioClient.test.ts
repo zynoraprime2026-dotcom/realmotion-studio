@@ -10,6 +10,7 @@ import {
   generateKeyArt,
   getMovie,
   getMovieSuggestions,
+  getUsage,
   reshootScene,
   videoStatus,
 } from '../lib/studioClient'
@@ -39,12 +40,12 @@ describe('studioClient', () => {
   it('falls back to the status code when the body is not JSON', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
-      status: 502,
+      status: 500,
       json: async () => {
         throw new SyntaxError('not json')
       },
     }) as unknown as typeof fetch
-    await expect(generateContent('a topic worth a script')).rejects.toThrow(/\(502\)/)
+    await expect(generateContent('a topic worth a script')).rejects.toThrow(/\(500\)/)
   })
 
   it('accepts the media URL under any of the fields studio-api uses', async () => {
@@ -197,5 +198,18 @@ describe('re-cuts', () => {
     await cutTrailer('mov_1')
     expect(JSON.parse(String((post.mock.calls[0]?.[1] as RequestInit).body)).action).toBe('movie-vertical')
     expect(JSON.parse(String((post.mock.calls[1]?.[1] as RequestInit).body)).action).toBe('movie-trailer')
+  })
+})
+
+
+describe('a sleeping free instance', () => {
+  it('retries once instead of failing the person in front of the screen', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) } as unknown as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ used: 89, limit: 100, remaining: 11 }) } as unknown as Response)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    const usage = await getUsage()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(usage.remaining).toBe(11)
   })
 })

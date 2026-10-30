@@ -4,8 +4,11 @@ import {
   ACTIVE_MOVIE_STATUSES,
   assembleMovie,
   createMovieFromDraft,
+  createSeries,
   cutTrailer,
   cutVertical,
+  getUsage,
+  listSeries,
   draftMovie,
   filmAssetUrl,
   filmUrl,
@@ -17,6 +20,8 @@ import {
   reshootScene,
   type FilmPackage,
   type FilmQuality,
+  type FilmSeries,
+  type StudioUsage,
   type MovieDraft,
   type MovieDraftScene,
   type MovieStatus,
@@ -61,6 +66,13 @@ export function Director({ notify, onFilms }: DirectorProps) {
     return saved === 'storyboard' || saved === 'high' ? saved : 'standard'
   })
   const [cutBusy, setCutBusy] = useState<'vertical' | 'trailer' | null>(null)
+  const [usage, setUsage] = useState<StudioUsage | null>(null)
+  const [series, setSeries] = useState<FilmSeries[]>([])
+  const [seriesId, setSeriesId] = useState(() => localStorage.getItem('studio.series') ?? '')
+  const [bibleOpen, setBibleOpen] = useState(false)
+  const [bibleName, setBibleName] = useState('')
+  const [bibleText, setBibleText] = useState('')
+  const [bibleBusy, setBibleBusy] = useState(false)
 
   const refreshLibrary = useCallback(() => {
     listMovies()
@@ -158,7 +170,7 @@ export function Director({ notify, onFilms }: DirectorProps) {
     setError('')
     setBusy(true)
     try {
-      const next = await draftMovie({ prompt: prompt.trim(), aspectRatio: ratio, scenes: shotCount })
+      const next = await draftMovie({ prompt: prompt.trim(), aspectRatio: ratio, scenes: shotCount, seriesId: seriesId || undefined })
       setDraft(next)
       setTitle(next.title)
       setShots(next.scenes)
@@ -168,6 +180,39 @@ export function Director({ notify, onFilms }: DirectorProps) {
       setError(e instanceof Error ? e.message : 'The studio could not draft that shot list.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    void getUsage().then(setUsage).catch(() => setUsage(null))
+    void listSeries().then(setSeries).catch(() => setSeries([]))
+  }, [])
+
+  // what this render will actually cost, straight from the studio's own numbers
+  const costs = usage?.movie_costs ?? { storyboard: 4, standard: 20, high: 30 }
+  const renderCost = costs[quality]
+  const shortOnUses = usage !== null && usage.remaining < renderCost
+
+  const saveBible = async () => {
+    if (bibleName.trim().length < 2) {
+      setError('Give the series a name.')
+      return
+    }
+    setBibleBusy(true)
+    setError('')
+    try {
+      const created = await createSeries(bibleName.trim(), bibleText.trim())
+      setSeries((current) => [created, ...current])
+      setSeriesId(created.id)
+      localStorage.setItem('studio.series', created.id)
+      setBibleName('')
+      setBibleText('')
+      setBibleOpen(false)
+      notify(`"${created.name}" saved. Every film in it keeps the same look and cast.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That series could not be saved.')
+    } finally {
+      setBibleBusy(false)
     }
   }
 
@@ -190,7 +235,9 @@ export function Director({ notify, onFilms }: DirectorProps) {
         shots.map((shot) => ({ visualPrompt: shot.visualPrompt, narrationText: shot.narrationText, duration: shot.duration })),
         title.trim() || draft.title,
         quality,
+        seriesId || undefined,
       )
+      void getUsage().then(setUsage).catch(() => undefined)
       setStage('film')
       setMovie({ id: created.movie_id, title: title.trim() || draft.title, status: 'queued', progress: 0, step: null, error: null, assemblyStale: false, continuity: created.continuity ?? 'chained', scenes: [] })
       notify('Rendering: stills, then chained shots, then the cut.')
@@ -333,6 +380,24 @@ export function Director({ notify, onFilms }: DirectorProps) {
             </ol>
 
             {error && <p className="director-error" role="alert">{error}</p>}
+            <div className="allowance">
+              {usage ? (
+                <>
+                  <p className={`allowance-line${shortOnUses ? ' is-short' : ''}`}>
+                    {usage.remaining} of {usage.limit} uses left this month · {quality} render costs {renderCost}
+                  </p>
+                  {shortOnUses && (
+                    <p className="allowance-hint">
+                      Not enough left for this tier. {costs.storyboard <= usage.remaining
+                        ? `Storyboard costs ${costs.storyboard} and still produces a real film, just with held stills instead of moving shots.`
+                        : 'Top the monthly limit up in the Render dashboard, then reload this page.'}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="allowance-line">Allowance unknown right now. The studio will tell you at render time.</p>
+              )}
+            </div>
             <div className="director-actions">
               <div className="quality-row" role="radiogroup" aria-label="Render quality">
                 {([
@@ -353,8 +418,35 @@ export function Director({ notify, onFilms }: DirectorProps) {
                   </button>
                 ))}
               </div>
+              <div className="series-block">
+                <label className="field-label" htmlFor="director-series">SERIES (OPTIONAL)</label>
+                <select
+                  id="director-series"
+                  className="series-select"
+                  value={seriesId}
+                  onChange={(event) => {
+                    setSeriesId(event.target.value)
+                    localStorage.setItem('studio.series', event.target.value)
+                  }}
+                >
+                  <option value="">A one-off film</option>
+                  {series.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+                </select>
+                <button type="button" className="text-action" onClick={() => setBibleOpen((open) => !open)}>
+                  {bibleOpen ? 'Cancel' : 'Write a series bible'}
+                </button>
+                {bibleOpen && (
+                  <div className="series-form">
+                    <input className="series-input" placeholder="Series name" value={bibleName} onChange={(event) => setBibleName(event.target.value)} aria-label="Series name" />
+                    <textarea className="series-input" rows={3} placeholder="The look, the cast, the rules those films must obey" value={bibleText} onChange={(event) => setBibleText(event.target.value)} aria-label="Series bible" />
+                    <button type="button" className="chip" onClick={() => void saveBible()} disabled={bibleBusy}>
+                      {bibleBusy ? 'Saving…' : 'Save series'}
+                    </button>
+                  </div>
+                )}
+              </div>
               <p className="director-note">RENDER: STILLS → CHAINED SHOTS → VOICE → MUSIC → SUBTITLES → CUT</p>
-              <button type="button" className="director-button" onClick={renderFilm} disabled={busy}>
+              <button type="button" className="director-button" onClick={renderFilm} disabled={busy || shortOnUses}>
                 {busy ? <><Loader2 size={17} className="spin" /> Starting…</> : <><Clapperboard size={17} /> Render this film</>}
               </button>
             </div>

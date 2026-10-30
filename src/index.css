@@ -2024,3 +2024,14 @@ input:disabled {
 .quality-option strong { font-size: 0.92rem; }
 .quality-option span { font-size: 0.75rem; color: #8FB3B0; }
 .quality-option.is-on { border-color: #F3ECDA; background: rgba(243, 236, 218, 0.08); }
+
+/* the month's allowance, shown before anything is spent */
+.allowance { margin: 0 0 14px; }
+.allowance-line { margin: 0; font-size: 0.86rem; color: #8FB3B0; letter-spacing: 0.01em; }
+.allowance-line.is-short { color: #E9B872; }
+.allowance-hint { margin: 6px 0 0; font-size: 0.82rem; color: #E9B872; max-width: 62ch; }
+
+/* series bible */
+.series-block { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 16px; max-width: 460px; }
+.series-select, .series-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(243, 236, 218, 0.22); background: rgba(243, 236, 218, 0.04); color: #F3ECDA; font: inherit; font-size: 0.9rem; }
+.series-form { display: flex; flex-direction: column; gap: 8px; }
