@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Clapperboard } from 'lucide-react'
-import { animateScene, videoStatus } from '../lib/studioClient'
+import { animateScene, modelLabel, videoStatus } from '../lib/studioClient'
 
 type AnimateProps = {
   imageUrl: string
@@ -34,7 +34,8 @@ export function Animate({ imageUrl, prompt, onVideo, notify }: AnimateProps) {
         setProgress(job.progress || Math.min(95, 20 + attempt * 2))
         if (job.status === 'done' && job.videoUrl) {
           onVideo(job.videoUrl)
-          notify(`Added a ${CLIP_SECONDS}s clip to this scene.`)
+          const made = modelLabel(job.model)
+          notify(made ? `Added a ${CLIP_SECONDS}s clip to this scene, rendered with ${made}.` : `Added a ${CLIP_SECONDS}s clip to this scene.`)
           return
         }
         if (job.status === 'failed') throw new Error(job.error || 'The studio could not finish this animation.')
