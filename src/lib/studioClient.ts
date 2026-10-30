@@ -54,6 +54,20 @@ export type VideoStatus = {
   progress: number
   videoUrl: string | null
   error: string | null
+  /** provider:slug of the model that rendered the clip, once known */
+  model: string | null
+}
+
+/** Turns "replicate:kwaivgi/kling-v2.5-turbo-pro" into something readable. */
+export function modelLabel(model: string | null): string {
+  if (!model) return ''
+  const slug = model.includes(':') ? model.slice(model.indexOf(':') + 1) : model
+  const name = slug.split('/').filter(Boolean).pop() || slug
+  return name
+    .replace(/[-_]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /** Hands a still to the studio and returns the job id to poll. */
@@ -71,5 +85,6 @@ export async function videoStatus(jobId: string): Promise<VideoStatus> {
     progress: typeof payload.progress === 'number' ? payload.progress : 0,
     videoUrl: typeof payload.video_url === 'string' ? payload.video_url : null,
     error: typeof payload.error === 'string' ? payload.error : null,
+    model: typeof payload.model === 'string' ? payload.model : null,
   }
 }
