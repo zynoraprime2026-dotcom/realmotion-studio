@@ -142,6 +142,13 @@ describe('allowance and series', () => {
       .toEqual({ action: 'series-create', payload: { name: 'Zanj Cycle', bible: 'indigo and ochre' } })
   })
 
+  it('asks for bible suggestions only once there is something to read', () => {
+    expect(validateProxyBody({ action: 'series-suggestions' })).toHaveProperty('error')
+    expect(validateProxyBody({ action: 'series-suggestions', bible: 'Ochre coast, indigo haze.' }))
+      .toEqual({ action: 'series-suggestions', payload: { name: '', bible: 'Ochre coast, indigo haze.', prompt: '' } })
+    expect(upstreamPath('series-suggestions', {})).toBe('/v1/series/suggestions')
+  })
+
   it('takes a series id on a draft, and rejects a nonsense one', () => {
     const base = { action: 'draft', prompt: 'A sailmaker follows a compass that points down.', aspectRatio: '16:9', scenes: 5 }
     expect(validateProxyBody({ ...base, seriesId: 'ser_3fb55b9e-5ef9-49e9-acd9-e5e9094cf0ed' })).not.toHaveProperty('error')

@@ -2035,3 +2035,11 @@ input:disabled {
 .series-block { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 16px; max-width: 460px; }
 .series-select, .series-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(243, 236, 218, 0.22); background: rgba(243, 236, 218, 0.04); color: #F3ECDA; font: inherit; font-size: 0.9rem; }
 .series-form { display: flex; flex-direction: column; gap: 8px; }
+
+/* what the bible is missing, offered as lines you can take */
+.suggestion-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.suggestion-card { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(243, 236, 218, 0.18); background: rgba(243, 236, 218, 0.05); color: inherit; font: inherit; cursor: pointer; transition: border-color 120ms ease, background 120ms ease; }
+.suggestion-card:hover, .suggestion-card:focus-visible { border-color: #D4F800; background: rgba(212, 248, 0, 0.08); }
+.suggestion-label { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #D4F800; }
+.suggestion-text { font-size: 0.88rem; line-height: 1.45; color: rgba(243, 236, 218, 0.86); }
+.suggestion-add { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(243, 236, 218, 0.45); }

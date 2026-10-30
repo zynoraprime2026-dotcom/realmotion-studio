@@ -38,6 +38,7 @@ const ALLOWED_ACTIONS = [
   'usage',
   'series-list',
   'series-create',
+  'series-suggestions',
 ] as const
 type StudioAction = (typeof ALLOWED_ACTIONS)[number]
 
@@ -105,6 +106,8 @@ export function upstreamPath(action: StudioAction, payload: Record<string, strin
     case 'series-list':
     case 'series-create':
       return '/v1/series'
+    case 'series-suggestions':
+      return '/v1/series/suggestions'
     case 'image':
     case 'content':
     case 'animate':
@@ -220,6 +223,16 @@ export function validateProxyBody(body: unknown): Validated {
   }
 
   if (action === 'movie-list' || action === 'usage' || action === 'series-list') return { action, payload: {} }
+
+  if (action === 'series-suggestions') {
+    const name = readString(raw.name)
+    const bible = readString(raw.bible)
+    const prompt = readString(raw.prompt)
+    if (!name && !bible && !prompt) return { error: 'Write a name, an idea or a line of the bible first.' }
+    if (name.length > 80) return { error: 'Keep the series name under 80 characters.' }
+    if (bible.length > 2000) return { error: 'Keep the series bible under 2000 characters.' }
+    return { action, payload: { name, bible, prompt } }
+  }
 
   if (action === 'series-create') {
     const name = readString(raw.name)

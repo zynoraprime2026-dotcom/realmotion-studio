@@ -157,7 +157,10 @@ export type StudioUsage = {
   draft_cost?: number
 }
 
-export type FilmSeries = { id: string; name: string; bible: string; created_at?: string }
+export type FilmSeries = { id: string; name: string; bible: string; prompt?: string | null; created_at?: string }
+
+/** One thing the bible is missing, written so it can be accepted in a tap. */
+export type SeriesSuggestion = { label: string; text: string }
 
 export async function getUsage(): Promise<StudioUsage> {
   return post<StudioUsage>({ action: 'usage' })
@@ -166,6 +169,11 @@ export async function getUsage(): Promise<StudioUsage> {
 export async function listSeries(): Promise<FilmSeries[]> {
   const response = await post<{ series?: FilmSeries[] }>({ action: 'series-list' })
   return response.series ?? []
+}
+
+export async function suggestSeries(name: string, bible: string): Promise<SeriesSuggestion[]> {
+  const response = await post<{ suggestions?: SeriesSuggestion[] }>({ action: 'series-suggestions', name, bible })
+  return response.suggestions ?? []
 }
 
 export async function createSeries(name: string, bible: string): Promise<FilmSeries> {
