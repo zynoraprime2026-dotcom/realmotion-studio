@@ -82,7 +82,7 @@ export function Hero({ onStart }: HeroProps) {
           <em>Infinite cinema.</em>
         </h1>
         <div className="hero-intro">
-          <p>Shape the story, direct the look, and turn your idea into a shot-by-shot film plan.</p>
+          <p>One line in, a finished short film out: shots that hold together, a spoken voice-over, music, subtitles and the cut.</p>
           <button className="button button-acid" type="button" onClick={onStart}>
             Enter the studio
             <ArrowDown size={18} strokeWidth={1.8} aria-hidden="true" />

@@ -100,9 +100,9 @@ export function Studio({ seed, onSave, notify }: StudioProps) {
       <div className="section-heading page-gutter">
         <div>
           <p className="eyebrow dark-ink">THE DIRECTOR’S DESK</p>
-          <h2>Start with a feeling.<br /><em>Leave with a film plan.</em></h2>
+          <h2>Start with a feeling.<br /><em>Leave with a shot plan.</em></h2>
         </div>
-        <p className="section-summary dark-ink">Write the spark, choose the visual language, and shape every beat. Storyboard briefs and treatments are generated in this browser. Key art and single-scene motion come from the studio API. For a whole film with voice-over, music and a cut, use Director Mode below.</p>
+        <p className="section-summary dark-ink">Sketch the spark, choose the visual language, and shape every beat. Storyboards and treatments are built in this browser and cost nothing. This desk is for planning; Director Mode below renders the finished film with voice-over, music and the cut.</p>
       </div>
 
       <div className="studio-workspace page-gutter">

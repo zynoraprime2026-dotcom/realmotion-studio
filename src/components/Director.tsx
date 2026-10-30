@@ -44,6 +44,15 @@ type DirectorProps = {
 
 type Stage = 'write' | 'review' | 'film'
 
+/** A state a person can read at a glance, rather than the API's enum. */
+function stateWord(status: string): string {
+  if (status === 'done') return 'ready'
+  if (status === 'partial') return 'shots failed'
+  if (status === 'failed') return 'stopped'
+  if (status === 'queued') return 'waiting to start'
+  return status
+}
+
 export function Director({ notify, onFilms }: DirectorProps) {
   const [stage, setStage] = useState<Stage>('write')
   const [prompt, setPrompt] = useState(examplePrompt)
@@ -323,7 +332,9 @@ export function Director({ notify, onFilms }: DirectorProps) {
               <button type="button" className="director-button" onClick={writeDraft} disabled={busy}>
                 {busy ? <><Loader2 size={17} className="spin" /> Drafting shots…</> : <><Wand2 size={17} /> Draft the shot list</>}
               </button>
-              <p className="director-note">DRAFTING IS FREE · NOTHING RENDERS UNTIL YOU APPROVE THE SHOTS</p>
+              <p className="director-note">
+                DRAFT COSTS {usage?.draft_cost ?? 1} {usage?.draft_cost === 1 ? 'USE' : 'USES'} · NOTHING RENDERS UNTIL YOU APPROVE THE SHOTS
+              </p>
             </div>
 
             <aside className="director-library">
@@ -335,7 +346,7 @@ export function Director({ notify, onFilms }: DirectorProps) {
                   <li key={entry.id}>
                     <button type="button" className="library-row" onClick={() => openFilm(entry)}>
                       <span className="library-title">{entry.title}</span>
-                      <span className={`library-status status-${entry.status}`}>{entry.status}{isActive(entry.status) ? ` ${entry.progress ?? 0}%` : ''}</span>
+                      <span className={`library-status status-${entry.status}`}>{stateWord(entry.status)}{isActive(entry.status) ? ` ${entry.progress ?? 0}%` : ''}</span>
                     </button>
                   </li>
                 ))}
@@ -462,8 +473,12 @@ export function Director({ notify, onFilms }: DirectorProps) {
                   {isActive(movie.status)
                     ? `${movie.step ?? 'queued'} · ${movie.progress ?? 0}%`
                     : movie.status === 'done'
-                      ? `cut · ${movie.status}`
-                      : movie.status}
+                      ? 'cut and ready to watch'
+                      : movie.status === 'partial'
+                        ? 'some shots failed. Open it to see which, then re-shoot those.'
+                        : movie.status === 'failed'
+                          ? 'this render stopped. Open it to see why before spending again.'
+                          : movie.status}
                 </p>
               </div>
               <div className="director-head-actions">
@@ -565,7 +580,7 @@ export function Director({ notify, onFilms }: DirectorProps) {
                     <li key={entry.id}>
                       <button type="button" className="library-row" onClick={() => void openFilm(entry)}>
                         <span className="library-title">{entry.title}</span>
-                        <span className={`library-status status-${entry.status}`}>{entry.status}</span>
+                        <span className={`library-status status-${entry.status}`}>{stateWord(entry.status)}</span>
                       </button>
                     </li>
                   ))}
