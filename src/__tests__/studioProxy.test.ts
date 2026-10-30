@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clientIp, createLimiter, validateProxyBody } from '../../api/studio'
+import { clientIp, createLimiter, upstreamPath, validateProxyBody } from '../../api/studio'
 
 describe('validateProxyBody', () => {
   it('rejects an unknown action and names the allowed ones', () => {
@@ -79,3 +79,13 @@ describe('validateProxyBody: animation', () => {
   })
 })
 
+
+describe('validateProxyBody: the film list', () => {
+  it('accepts movie-list with no arguments', () => {
+    expect(validateProxyBody({ action: 'movie-list' })).toEqual({ action: 'movie-list', payload: {} })
+  })
+
+  it('reads the list from /v1/movie/list', () => {
+    expect(upstreamPath('movie-list', {})).toBe('/v1/movie/list')
+  })
+})

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Clapperboard, Loader2, RefreshCw, Scissors, Wand2 } from 'lucide-react'
 import {
   ACTIVE_MOVIE_STATUSES,
@@ -44,45 +44,42 @@ export function Director({ notify }: DirectorProps) {
   const [suggestions, setSuggestions] = useState<MovieSuggestion[]>([])
   const [workingScene, setWorkingScene] = useState<number | null>(null)
   const [library, setLibrary] = useState<MovieSummary[]>([])
-  const pollTimer = useRef<number | undefined>(undefined)
 
-  const refreshLibrary = useCallback(async () => {
-    try {
-      setLibrary(await listMovies())
-    } catch {
-      setLibrary([])
-    }
+  const refreshLibrary = useCallback(() => {
+    listMovies()
+      .then((rows) => setLibrary(rows))
+      .catch(() => setLibrary([]))
   }, [])
 
   useEffect(() => {
-    void refreshLibrary()
-  }, [refreshLibrary])
+    let alive = true
+    listMovies()
+      .then((rows) => { if (alive) setLibrary(rows) })
+      .catch(() => { if (alive) setLibrary([]) })
+    return () => { alive = false }
+  }, [])
 
-  useEffect(() => () => window.clearTimeout(pollTimer.current), [])
-
-  const follow = useCallback(async (movieId: string) => {
-    try {
-      const status = await getMovie(movieId)
-      setMovie(status)
-      if (isActive(status.status)) {
-        pollTimer.current = window.setTimeout(() => { void follow(movieId) }, 5000)
-        return
-      }
-      if (status.status === 'done' || status.status === 'partial') {
-        const advice = await getMovieSuggestions(movieId).catch(() => null)
-        setSuggestions(advice?.suggestions ?? [])
-        if (status.status === 'done') notify('Your film is cut and ready.')
-      }
-      void refreshLibrary()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Lost contact with the studio while polling.')
-    }
-  }, [notify, refreshLibrary])
-
-  const startPoll = (movieId: string) => {
-    window.clearTimeout(pollTimer.current)
-    void follow(movieId)
-  }
+  // one poll per status change: a finished film stops the loop on its own
+  const movieId = movie?.id
+  const movieStatus = movie?.status ?? ''
+  useEffect(() => {
+    if (!movieId || !isActive(movieStatus)) return
+    const timer = window.setTimeout(() => {
+      getMovie(movieId)
+        .then((status) => {
+          setMovie(status)
+          if (status.status === 'done' || status.status === 'partial') {
+            getMovieSuggestions(movieId)
+              .then((advice) => setSuggestions(advice.suggestions))
+              .catch(() => setSuggestions([]))
+            if (status.status === 'done') notify('Your film is cut and ready.')
+            refreshLibrary()
+          }
+        })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Lost contact with the studio while polling.'))
+    }, 5000)
+    return () => window.clearTimeout(timer)
+  }, [movieId, movieStatus, notify, refreshLibrary])
 
   const openFilm = async (summary: MovieSummary) => {
     setStage('film')
@@ -90,7 +87,6 @@ export function Director({ notify }: DirectorProps) {
     setError('')
     setSuggestions([])
     setMovie({ id: summary.id, title: summary.title, status: summary.status, progress: summary.progress ?? 0, step: null, error: null, assemblyStale: false, continuity: 'chained', scenes: [] })
-    startPoll(summary.id)
   }
 
   const writeDraft = async () => {
@@ -133,8 +129,7 @@ export function Director({ notify }: DirectorProps) {
         title.trim() || draft.title,
       )
       setStage('film')
-      setMovie({ id: created.movie_id, title: title.trim() || draft.title, status: created.status, progress: 0, step: null, error: null, assemblyStale: false, continuity: created.continuity ?? 'chained', scenes: [] })
-      startPoll(created.movie_id)
+      setMovie({ id: created.movie_id, title: title.trim() || draft.title, status: 'queued', progress: 0, step: null, error: null, assemblyStale: false, continuity: created.continuity ?? 'chained', scenes: [] })
       notify('Rendering: stills, then chained shots, then the cut.')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The studio could not start that render.')
@@ -150,7 +145,7 @@ export function Director({ notify }: DirectorProps) {
       await reshootScene(movie.id, scene)
       setStage('film')
       notify(`Re-shooting shot ${scene}. The rest of the film is kept.`)
-      startPoll(movie.id)
+      setMovie({ ...movie, status: 'processing', step: 're-shoot', progress: 5, error: null })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That shot could not be re-shot.')
     } finally {
@@ -163,7 +158,7 @@ export function Director({ notify }: DirectorProps) {
     setBusy(true)
     try {
       await assembleMovie(movie.id)
-      startPoll(movie.id)
+      setMovie({ ...movie, status: 'assembling', step: 'assembly', progress: 90, error: null })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The cut could not be rebuilt.')
     } finally {
@@ -172,7 +167,6 @@ export function Director({ notify }: DirectorProps) {
   }
 
   const startOver = () => {
-    window.clearTimeout(pollTimer.current)
     setStage('write')
     setDraft(null)
     setShots([])
