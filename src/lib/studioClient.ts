@@ -2,6 +2,8 @@
 
 export type StudioError = { message: string }
 
+const WAKING_STATUSES = [502, 503, 504]
+
 async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
@@ -9,6 +11,19 @@ async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
   } catch {
     // Offline, or the platform answered with something that is not a response.
     throw new Error('Couldn\u2019t reach the studio. Check your connection and try again.')
+  }
+  // The render engine sleeps when nobody is filming. One patient retry wakes it
+  // instead of showing the person a mystery failure.
+  if (WAKING_STATUSES.includes(response.status)) {
+    await new Promise((resolve) => setTimeout(resolve, 2500))
+    try {
+      response = await fetch(url, init)
+    } catch {
+      throw new Error('The studio is still waking up. Give it a minute and try again.')
+    }
+    if (WAKING_STATUSES.includes(response.status)) {
+      throw new Error('The studio is still waking up. Give it a minute and try again.')
+    }
   }
   const payload: unknown = await response.json().catch(() => ({}))
   if (!response.ok) {
@@ -132,6 +147,32 @@ export type MovieDraft = {
   notes: string[]
 }
 
+/** What the month's allowance looks like, and what each render tier costs. */
+export type StudioUsage = {
+  month: string
+  used: number
+  limit: number
+  remaining: number
+  movie_costs?: { storyboard: number; standard: number; high: number }
+  draft_cost?: number
+}
+
+export type FilmSeries = { id: string; name: string; bible: string; created_at?: string }
+
+export async function getUsage(): Promise<StudioUsage> {
+  return post<StudioUsage>({ action: 'usage' })
+}
+
+export async function listSeries(): Promise<FilmSeries[]> {
+  const response = await post<{ series?: FilmSeries[] }>({ action: 'series-list' })
+  return response.series ?? []
+}
+
+export async function createSeries(name: string, bible: string): Promise<FilmSeries> {
+  const created = await post<{ series_id: string; name: string; bible: string }>({ action: 'series-create', name, bible })
+  return { id: created.series_id, name: created.name, bible: created.bible }
+}
+
 export type DraftMovieInput = {
   prompt: string
   style?: string
@@ -195,9 +236,13 @@ export type CreateMovieResponse = {
   continuity?: string
   draft_id?: string | null
   cost?: string
+  series_id?: string | null
 }
 
-export async function draftMovie(input: DraftMovieInput): Promise<MovieDraft> {
+export type DraftRequest = DraftMovieInput & { seriesId?: string }
+
+export async function draftMovie(input: DraftRequest): Promise<MovieDraft> {
+  // seriesId rides along so the shot list is written inside the series world
   return post<MovieDraft>({ action: 'draft', ...input })
 }
 
@@ -209,12 +254,14 @@ export async function createMovieFromDraft(
   scenes: Pick<MovieDraftScene, 'visualPrompt' | 'narrationText' | 'duration'>[],
   title?: string,
   quality?: FilmQuality,
+  seriesId?: string,
 ): Promise<CreateMovieResponse> {
   return post<CreateMovieResponse>({
     action: 'movie-create',
     draft_id: draftId,
     title,
     quality,
+    seriesId,
     scenes: scenes.map((scene) => ({
       visualPrompt: scene.visualPrompt.trim(),
       narrationText: scene.narrationText.trim(),

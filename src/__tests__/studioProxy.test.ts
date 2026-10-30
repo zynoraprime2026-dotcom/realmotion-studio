@@ -126,3 +126,25 @@ describe('validateProxyBody: the re-cuts', () => {
     expect(upstreamPath('movie-trailer', { movie_id: id })).toBe(`/v1/movie/${id}/trailer`)
   })
 })
+
+
+describe('allowance and series', () => {
+  it('reads usage and the series list without a body', () => {
+    expect(validateProxyBody({ action: 'usage' })).toEqual({ action: 'usage', payload: {} })
+    expect(validateProxyBody({ action: 'series-list' })).toEqual({ action: 'series-list', payload: {} })
+    expect(upstreamPath('usage', {})).toBe('/v1/usage')
+    expect(upstreamPath('series-list', {})).toBe('/v1/series')
+  })
+
+  it('needs a name before it will save a series bible', () => {
+    expect(validateProxyBody({ action: 'series-create', name: '', bible: 'x' })).toHaveProperty('error')
+    expect(validateProxyBody({ action: 'series-create', name: 'Zanj Cycle', bible: 'indigo and ochre' }))
+      .toEqual({ action: 'series-create', payload: { name: 'Zanj Cycle', bible: 'indigo and ochre' } })
+  })
+
+  it('takes a series id on a draft, and rejects a nonsense one', () => {
+    const base = { action: 'draft', prompt: 'A sailmaker follows a compass that points down.', aspectRatio: '16:9', scenes: 5 }
+    expect(validateProxyBody({ ...base, seriesId: 'ser_3fb55b9e-5ef9-49e9-acd9-e5e9094cf0ed' })).not.toHaveProperty('error')
+    expect(validateProxyBody({ ...base, seriesId: 'nope' })).toHaveProperty('error')
+  })
+})

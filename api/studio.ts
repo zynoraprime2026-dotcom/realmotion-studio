@@ -35,6 +35,9 @@ const ALLOWED_ACTIONS = [
   'movie-poster',
   'movie-vertical',
   'movie-trailer',
+  'usage',
+  'series-list',
+  'series-create',
 ] as const
 type StudioAction = (typeof ALLOWED_ACTIONS)[number]
 
@@ -67,6 +70,7 @@ const PATHS: Record<'image' | 'content' | 'animate' | 'draft' | 'movie-create', 
 
 const MOVIE_ID = /^mov_[A-Za-z0-9-]{8,}$/
 const DRAFT_ID = /^drf_[A-Za-z0-9-]{8,}$/
+const SERIES_ID = /^ser_[A-Za-z0-9-]{8,}$/
 const MAX_PROMPT_LONG = 2000
 const MAX_SCENES = 12
 const MIN_SCENES = 4
@@ -96,6 +100,11 @@ export function upstreamPath(action: StudioAction, payload: Record<string, strin
       return `/v1/movie/${movieId}/re-cut`
     case 'movie-list':
       return '/v1/movie/list'
+    case 'usage':
+      return '/v1/usage'
+    case 'series-list':
+    case 'series-create':
+      return '/v1/series'
     case 'image':
     case 'content':
     case 'animate':
@@ -110,7 +119,8 @@ export function upstreamPath(action: StudioAction, payload: Record<string, strin
 /** GET actions are reads: status polls and the finished film itself. */
 function isReadAction(action: StudioAction): boolean {
   return action === 'movie-status' || action === 'movie-suggestions' || action === 'movie-list' ||
-    action === 'movie-cast' || action === 'movie-package'
+    action === 'movie-cast' || action === 'movie-package' ||
+    action === 'usage' || action === 'series-list'
 }
 
 /** The POST body for an id-carrying action must not re-send the id upstream. */
@@ -174,6 +184,11 @@ export function validateProxyBody(body: unknown): Validated {
     if (Number.isFinite(scenes)) payload.scenes = Math.min(MAX_SCENES, Math.max(MIN_SCENES, Math.round(scenes)))
     const duration = Number(raw.duration)
     if (Number.isFinite(duration)) payload.duration = Math.min(10, Math.max(3, Math.round(duration)))
+    const seriesId = readString(raw.seriesId)
+    if (seriesId) {
+      if (!SERIES_ID.test(seriesId)) return { error: 'That series id does not look right.' }
+      payload.seriesId = seriesId
+    }
     return { action: 'draft', payload }
   }
 
@@ -204,7 +219,16 @@ export function validateProxyBody(body: unknown): Validated {
     return { action: 'movie-create', payload: payload as Record<string, string | number> }
   }
 
-  if (action === 'movie-list') return { action, payload: {} }
+  if (action === 'movie-list' || action === 'usage' || action === 'series-list') return { action, payload: {} }
+
+  if (action === 'series-create') {
+    const name = readString(raw.name)
+    const bible = readString(raw.bible)
+    if (name.length < 2) return { error: 'Give the series a name.' }
+    if (name.length > 80) return { error: 'Keep the series name under 80 characters.' }
+    if (bible.length > 2000) return { error: 'Keep the series bible under 2000 characters.' }
+    return { action, payload: { name, bible } }
+  }
 
   if (action === 'movie-cast' || action === 'movie-package') {
     const movieId = readString(raw.movie_id)
