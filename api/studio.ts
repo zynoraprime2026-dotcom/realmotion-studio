@@ -18,22 +18,51 @@ type MinimalResponse = {
   end?: (body?: unknown) => void
 }
 
-const ALLOWED_ACTIONS = ['image', 'content', 'animate', 'animate-status'] as const
+const ALLOWED_ACTIONS = [
+  'image',
+  'content',
+  'animate',
+  'animate-status',
+  'draft',
+  'movie-create',
+  'movie-status',
+  'movie-suggestions',
+  'movie-reshoot',
+  'movie-assemble',
+  'movie-list',
+] as const
 type StudioAction = (typeof ALLOWED_ACTIONS)[number]
 
 // Polling and reading a job must not eat the caller's hourly allowance.
-const METERED_ACTIONS: StudioAction[] = ['image', 'content', 'animate']
+const METERED_ACTIONS: StudioAction[] = [
+  'image',
+  'content',
+  'animate',
+  'draft',
+  'movie-create',
+  'movie-reshoot',
+  'movie-assemble',
+]
 
 const MIN_DIMENSION = 256
 const MAX_DIMENSION = 1536
 const MAX_PROMPT = 1200
 const MAX_TOPIC = 300
 
-const PATHS: Record<'image' | 'content' | 'animate', string> = {
+const PATHS: Record<'image' | 'content' | 'animate' | 'draft' | 'movie-create', string> = {
   image: '/v1/image/generate',
   content: '/v1/content/generate',
   animate: '/v1/video/image-to-video',
+  draft: '/v1/movie/draft',
+  'movie-create': '/v1/movie/create',
 }
+
+const MOVIE_ID = /^mov_[A-Za-z0-9-]{8,}$/
+const DRAFT_ID = /^drf_[A-Za-z0-9-]{8,}$/
+const MAX_PROMPT_LONG = 2000
+const MAX_SCENES = 12
+const MIN_SCENES = 4
+const MAX_STYLE = 300
 
 const MAX_IMAGE_URL = 600
 const JOB_ID = /^[A-Za-z0-9-]{8,64}$/
@@ -41,6 +70,40 @@ const JOB_ID = /^[A-Za-z0-9-]{8,64}$/
 type Validated =
   | { action: StudioAction; payload: Record<string, string | number> }
   | { error: string }
+
+/** Where an action lives upstream: fixed paths, plus the movie-id routes. */
+export function upstreamPath(action: StudioAction, payload: Record<string, string | number>): string {
+  const movieId = String(payload.movie_id ?? '')
+  switch (action) {
+    case 'movie-status':
+    case 'movie-suggestions':
+    case 'movie-reshoot':
+    case 'movie-assemble':
+      return `/v1/movie/${movieId}/${action.replace(/^movie-/g, '').replace('status', '')}`.replace(/\/$/, '')
+    case 'movie-list':
+      return '/v1/movie/list'
+    case 'image':
+    case 'content':
+    case 'animate':
+    case 'draft':
+    case 'movie-create':
+      return PATHS[action]
+    default:
+      return ''
+  }
+}
+
+/** GET actions are reads: status polls and the finished film itself. */
+function isReadAction(action: StudioAction): boolean {
+  return action === 'movie-status' || action === 'movie-suggestions' || action === 'movie-list'
+}
+
+/** The POST body for an id-carrying action must not re-send the id upstream. */
+function upstreamBody(payload: Record<string, string | number>): Record<string, string | number> {
+  const body = { ...payload }
+  delete body.movie_id
+  return body
+}
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -79,6 +142,58 @@ export function validateProxyBody(body: unknown): Validated {
     if (prompt.length > MAX_PROMPT) return { error: `Keep the prompt under ${MAX_PROMPT} characters.` }
     const duration = Math.min(10, Math.max(2, Math.round(Number(raw.duration) || 5)))
     return { action: 'animate', payload: { image_url: imageUrl, prompt, duration } }
+  }
+
+  // --- director mode -------------------------------------------------------
+  if (action === 'draft') {
+    const prompt = readString(raw.prompt)
+    if (prompt.length < 8) return { error: 'Describe the film in at least 8 characters.' }
+    if (prompt.length > MAX_PROMPT_LONG) return { error: `Keep the prompt under ${MAX_PROMPT_LONG} characters.` }
+    const payload: Record<string, string | number> = { prompt }
+    const style = readString(raw.style)
+    if (style) payload.style = style.slice(0, MAX_STYLE)
+    const language = readString(raw.language)
+    if (language) payload.language = language.slice(0, 40)
+    if (raw.aspectRatio === '16:9' || raw.aspectRatio === '9:16') payload.aspectRatio = raw.aspectRatio
+    const scenes = Number(raw.scenes)
+    if (Number.isFinite(scenes)) payload.scenes = Math.min(MAX_SCENES, Math.max(MIN_SCENES, Math.round(scenes)))
+    const duration = Number(raw.duration)
+    if (Number.isFinite(duration)) payload.duration = Math.min(10, Math.max(3, Math.round(duration)))
+    return { action: 'draft', payload }
+  }
+
+  if (action === 'movie-create') {
+    const draftId = readString(raw.draft_id)
+    if (!DRAFT_ID.test(draftId)) return { error: 'Render from an approved shot list: send the draft_id.' }
+    const payload: Record<string, unknown> = { draft_id: draftId }
+    const title = readString(raw.title)
+    if (title) payload.title = title.slice(0, 160)
+    // the edited shot list, already reviewed by a person before it is paid for
+    const scenes = Array.isArray(raw.scenes) ? raw.scenes : []
+    if (!scenes.length) return { error: 'Send the shot list you approved.' }
+    if (scenes.length > MAX_SCENES) return { error: `A film holds at most ${MAX_SCENES} scenes.` }
+    payload.scenes = scenes.map((scene) => {
+      const one = (scene ?? {}) as Record<string, unknown>
+      return {
+        visualPrompt: readString(one.visualPrompt).slice(0, 700),
+        narrationText: readString(one.narrationText).slice(0, 700),
+        duration: Math.min(10, Math.max(3, Math.round(Number(one.duration) || 5))),
+      }
+    })
+    return { action: 'movie-create', payload: payload as Record<string, string | number> }
+  }
+
+  if (action === 'movie-list') return { action, payload: {} }
+
+  if (action === 'movie-status' || action === 'movie-suggestions' || action === 'movie-reshoot' || action === 'movie-assemble') {
+    const movieId = readString(raw.movie_id)
+    if (!MOVIE_ID.test(movieId)) return { error: 'Send the movie_id returned when the film started.' }
+    if (action === 'movie-reshoot') {
+      const scene = Math.round(Number(raw.scene))
+      if (!Number.isFinite(scene) || scene < 1 || scene > MAX_SCENES) return { error: 'Choose which scene to re-shoot.' }
+      return { action, payload: { movie_id: movieId, scene } }
+    }
+    return { action, payload: { movie_id: movieId } }
   }
 
   if (action === 'animate-status') {
@@ -136,6 +251,24 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
     const query = req.query ?? {}
     const queryAction = readString(Array.isArray(query.action) ? query.action[0] : query.action)
 
+    // A browser <video> can only issue GET, so a finished film is streamed here.
+    if (req.method === 'GET' && queryAction === 'movie') {
+      const key = process.env.STUDIO_API_KEY
+      if (!key) return res.status(503).json({ error: 'AI artwork is not switched on for this deployment yet.' })
+      const movieId = readString(Array.isArray(query.movie_id) ? query.movie_id[0] : query.movie_id)
+      if (!MOVIE_ID.test(movieId)) return res.status(400).json({ error: 'Unknown film.' })
+      const base = (process.env.STUDIO_API_URL || 'https://studio-api-nqpm.onrender.com').replace(/\/+$/, '')
+      const upstream = await fetch(`${base}/v1/movie/${movieId}/file`, {
+        headers: { 'x-api-key': key },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      if (!upstream.ok || !upstream.body) return res.status(upstream.status === 200 ? 502 : upstream.status).json({ error: 'That film is not ready yet.' })
+      res.setHeader('Content-Type', upstream.headers.get('content-type') || 'video/mp4')
+      res.setHeader('Cache-Control', 'public, max-age=3600')
+      Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res as unknown as NodeJS.WritableStream)
+      return
+    }
+
     // A browser <video> can only issue GET, so a finished clip is streamed here.
     if (req.method === 'GET' && queryAction === 'video') {
       const key = process.env.STUDIO_API_KEY
@@ -176,15 +309,18 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
     }
 
     const upstreamBase = (process.env.STUDIO_API_URL || 'https://studio-api-nqpm.onrender.com').replace(/\/+$/, '')
-    const upstream = validated.action === 'animate-status'
-      ? await fetch(`${upstreamBase}/v1/video/status/${(validated.payload as Record<string, string>).job_id}`, {
+    const upstreamUrl = validated.action === 'animate-status'
+      ? `${upstreamBase}/v1/video/status/${validated.payload.job_id}`
+      : upstreamBase + upstreamPath(validated.action, validated.payload)
+    const upstream = isReadAction(validated.action) || validated.action === 'animate-status'
+      ? await fetch(upstreamUrl, {
           headers: { 'x-api-key': key },
           signal: AbortSignal.timeout(TIMEOUT_MS),
         })
-      : await fetch(upstreamBase + PATHS[validated.action], {
+      : await fetch(upstreamUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': key },
-          body: JSON.stringify(validated.payload),
+          body: JSON.stringify(upstreamBody(validated.payload)),
           signal: AbortSignal.timeout(TIMEOUT_MS),
         })
     if (!upstream.ok) {

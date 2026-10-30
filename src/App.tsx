@@ -10,6 +10,7 @@ import type { Film, Project, StudioSeed } from './data'
 const Explore = lazy(() => import('./components/Explore').then((m) => ({ default: m.Explore })))
 const MyFilms = lazy(() => import('./components/MyFilms').then((m) => ({ default: m.MyFilms })))
 const FilmModal = lazy(() => import('./components/FilmModal').then((m) => ({ default: m.FilmModal })))
+const Director = lazy(() => import('./components/Director').then((m) => ({ default: m.Director })))
 
 function SectionFallback({ label }: { label: string }) {
   return (
@@ -122,10 +123,11 @@ export default function App() {
         <nav className="desktop-nav" aria-label="Primary navigation">
           <a href="#studio">Create</a>
           <a href="#explore">Collection</a>
+          <a href="#films">Films</a>
           <a href="#my-films">My films <span>{projects.length.toString().padStart(2, '0')}</span></a>
         </nav>
         <div className="header-actions">
-          <span className="local-status"><i /> LOCAL STUDIO</span>
+          <span className="local-status"><i /> FILM STUDIO ONLINE</span>
           <button type="button" className="header-cta" onClick={scrollToStudio}>Start a film <span>↗</span></button>
           <button type="button" className="mobile-menu-button icon-button" onClick={() => setMobileOpen((value) => !value)} aria-expanded={mobileOpen} aria-controls="mobile-navigation" aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'}>
             {mobileOpen ? <X size={22} /> : <Menu size={22} />}
@@ -137,6 +139,7 @@ export default function App() {
         <nav className="mobile-nav" id="mobile-navigation" aria-label="Mobile navigation">
           <a href="#studio" onClick={closeMobile}>Create <span>01</span></a>
           <a href="#explore" onClick={closeMobile}>Collection <span>02</span></a>
+          <a href="#films" onClick={closeMobile}>Films <span>03</span></a>
           <a href="#my-films" onClick={closeMobile}>My films <span>{projects.length.toString().padStart(2, '0')}</span></a>
           <p>Ideas in. Cinema out.</p>
         </nav>
@@ -145,6 +148,9 @@ export default function App() {
       <main>
         <Hero onStart={scrollToStudio} />
         <Studio key={studioSession} seed={studioSeed} onSave={saveProject} notify={notify} />
+        <Suspense fallback={<SectionFallback label="director" />}>
+          <Director notify={notify} />
+        </Suspense>
         <Suspense fallback={<SectionFallback label="collection" />}>
           <Explore onSelect={setSelectedFilm} />
         </Suspense>
