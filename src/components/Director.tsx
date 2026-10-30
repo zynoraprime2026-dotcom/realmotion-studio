@@ -210,6 +210,21 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const renderCost = costs[quality]
   const shortOnUses = usage !== null && usage.remaining < renderCost
 
+  // A remembered series has to arrive in the form too, or the bible looks empty
+  // and both the suggestions and Save act on nothing.
+  const openBible = () => {
+    if (bibleOpen) {
+      setBibleOpen(false)
+      return
+    }
+    const picked = series.find((entry) => entry.id === seriesId)
+    if (picked) {
+      if (!bibleName.trim()) setBibleName(picked.name)
+      if (!bibleText.trim()) setBibleText(picked.bible ?? '')
+    }
+    setBibleOpen(true)
+  }
+
   const askForSuggestions = async () => {
     setSuggestBusy(true)
     setError('')
@@ -529,7 +544,7 @@ export function Director({ notify, onFilms }: DirectorProps) {
                   <option value="">A one-off film</option>
                   {series.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
                 </select>
-                <button type="button" className="text-action" onClick={() => setBibleOpen((open) => !open)}>
+                <button type="button" className="text-action" onClick={openBible}>
                   {bibleOpen ? 'Cancel' : seriesId ? 'Edit this series bible' : 'Write a series bible'}
                 </button>
                 {bibleOpen && (
