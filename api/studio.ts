@@ -30,6 +30,9 @@ const ALLOWED_ACTIONS = [
   'movie-reshoot',
   'movie-assemble',
   'movie-list',
+  'movie-cast',
+  'movie-package',
+  'movie-poster',
 ] as const
 type StudioAction = (typeof ALLOWED_ACTIONS)[number]
 
@@ -42,6 +45,7 @@ const METERED_ACTIONS: StudioAction[] = [
   'movie-create',
   'movie-reshoot',
   'movie-assemble',
+  'movie-poster',
 ]
 
 const MIN_DIMENSION = 256
@@ -79,6 +83,9 @@ export function upstreamPath(action: StudioAction, payload: Record<string, strin
     case 'movie-suggestions':
     case 'movie-reshoot':
     case 'movie-assemble':
+    case 'movie-cast':
+    case 'movie-package':
+    case 'movie-poster':
       return `/v1/movie/${movieId}/${action.replace(/^movie-/g, '').replace('status', '')}`.replace(/\/$/, '')
     case 'movie-list':
       return '/v1/movie/list'
@@ -95,7 +102,8 @@ export function upstreamPath(action: StudioAction, payload: Record<string, strin
 
 /** GET actions are reads: status polls and the finished film itself. */
 function isReadAction(action: StudioAction): boolean {
-  return action === 'movie-status' || action === 'movie-suggestions' || action === 'movie-list'
+  return action === 'movie-status' || action === 'movie-suggestions' || action === 'movie-list' ||
+    action === 'movie-cast' || action === 'movie-package'
 }
 
 /** The POST body for an id-carrying action must not re-send the id upstream. */
@@ -185,6 +193,18 @@ export function validateProxyBody(body: unknown): Validated {
 
   if (action === 'movie-list') return { action, payload: {} }
 
+  if (action === 'movie-cast' || action === 'movie-package') {
+    const movieId = readString(raw.movie_id)
+    if (!MOVIE_ID.test(movieId)) return { error: 'Send the movie_id returned when the film started.' }
+    return { action, payload: { movie_id: movieId } }
+  }
+
+  if (action === 'movie-poster') {
+    const movieId = readString(raw.movie_id)
+    if (!MOVIE_ID.test(movieId)) return { error: 'Send the movie_id returned when the film started.' }
+    return { action, payload: { movie_id: movieId } }
+  }
+
   if (action === 'movie-status' || action === 'movie-suggestions' || action === 'movie-reshoot' || action === 'movie-assemble') {
     const movieId = readString(raw.movie_id)
     if (!MOVIE_ID.test(movieId)) return { error: 'Send the movie_id returned when the film started.' }
@@ -265,6 +285,36 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
       if (!upstream.ok || !upstream.body) return res.status(upstream.status === 200 ? 502 : upstream.status).json({ error: 'That film is not ready yet.' })
       res.setHeader('Content-Type', upstream.headers.get('content-type') || 'video/mp4')
       res.setHeader('Cache-Control', 'public, max-age=3600')
+      Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res as unknown as NodeJS.WritableStream)
+      return
+    }
+
+    // Deliverables (script, shot list, subtitles, poster) are downloads, so they
+    // stream through here for the same reason the film does: the key stays server-side.
+    if (req.method === 'GET' && queryAction === 'movie-asset') {
+      const key = process.env.STUDIO_API_KEY
+      if (!key) return res.status(503).json({ error: 'AI artwork is not switched on for this deployment yet.' })
+      const movieId = readString(Array.isArray(query.movie_id) ? query.movie_id[0] : query.movie_id)
+      const asset = readString(Array.isArray(query.asset) ? query.asset[0] : query.asset)
+      if (!MOVIE_ID.test(movieId)) return res.status(400).json({ error: 'Unknown film.' })
+      const ASSETS: Record<string, { path: string; type: string; name: string }> = {
+        script: { path: `/v1/movie/${movieId}/script`, type: 'text/markdown; charset=utf-8', name: 'script.md' },
+        shotlist: { path: `/v1/movie/${movieId}/script?format=csv`, type: 'text/csv; charset=utf-8', name: 'shotlist.csv' },
+        subtitles: { path: `/v1/movie/${movieId}/subtitles?format=srt`, type: 'text/plain; charset=utf-8', name: 'subtitles.srt' },
+        poster: { path: `/v1/movie/${movieId}/poster`, type: 'image/jpeg', name: 'poster.jpg' },
+      }
+      const spec = ASSETS[asset]
+      if (!spec) return res.status(400).json({ error: 'Unknown deliverable.' })
+      const base = (process.env.STUDIO_API_URL || 'https://studio-api-nqpm.onrender.com').replace(/\/+$/, '')
+      const upstream = await fetch(base + spec.path, {
+        headers: { 'x-api-key': key },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      if (!upstream.ok || !upstream.body) {
+        return res.status(upstream.status === 404 ? 404 : 502).json({ error: 'That deliverable is not ready yet.' })
+      }
+      res.setHeader('Content-Type', spec.type)
+      res.setHeader('Content-Disposition', `attachment; filename="${spec.name}"`)
       Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res as unknown as NodeJS.WritableStream)
       return
     }

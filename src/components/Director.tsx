@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clapperboard, Loader2, RefreshCw, Scissors, Wand2 } from 'lucide-react'
+import { Clapperboard, Loader2, RefreshCw, Scissors, Sparkles, Wand2 } from 'lucide-react'
 import {
   ACTIVE_MOVIE_STATUSES,
   assembleMovie,
   createMovieFromDraft,
   draftMovie,
+  filmAssetUrl,
   filmUrl,
+  generateFilmPoster,
+  getFilmPackage,
   getMovie,
   getMovieSuggestions,
   listMovies,
   reshootScene,
+  type FilmPackage,
   type MovieDraft,
   type MovieDraftScene,
   type MovieStatus,
@@ -47,6 +51,8 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const [workingScene, setWorkingScene] = useState<number | null>(null)
   const [library, setLibrary] = useState<MovieSummary[]>([])
   const [libraryError, setLibraryError] = useState('')
+  const [pack, setPack] = useState<FilmPackage | null>(null)
+  const [posterBusy, setPosterBusy] = useState(false)
 
   const refreshLibrary = useCallback(() => {
     listMovies()
@@ -63,6 +69,28 @@ export function Director({ notify, onFilms }: DirectorProps) {
   }, [])
 
   useEffect(() => { onFilms?.(library.length) }, [library.length, onFilms])
+
+  // The production package: cast, deliverables, whether a poster exists.
+  useEffect(() => {
+    if (!movie || isActive(movie.status) || movie.status === 'queued') return
+    let alive = true
+    getFilmPackage(movie.id).then((p) => { if (alive) setPack(p) }).catch(() => { if (alive) setPack(null) })
+    return () => { alive = false }
+  }, [movie])
+
+  const makePoster = async () => {
+    if (!movie) return
+    setPosterBusy(true)
+    try {
+      await generateFilmPoster(movie.id)
+      setPack(await getFilmPackage(movie.id))
+      notify('Poster ready. It is in the file list below.')
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'The poster could not be made.')
+    } finally {
+      setPosterBusy(false)
+    }
+  }
 
   // one poll per status change: a finished film stops the loop on its own
   const movieId = movie?.id
@@ -318,6 +346,37 @@ export function Director({ notify, onFilms }: DirectorProps) {
             )}
 
             {movie.error && <p className="director-error" role="alert">{movie.error}</p>}
+
+            {pack && pack.id === movie.id && !isActive(movie.status) && movie.status !== 'queued' && (
+              <div className="director-delivery">
+                <h3>The finished film, as files</h3>
+                {pack.cast.length > 0 && (
+                  <p className="director-cast">
+                    <span className="field-label">CAST</span>{' '}
+                    {pack.cast.map((c) => `${c.speaker} (${c.lines} ${c.lines === 1 ? 'line' : 'lines'})`).join(' · ')}
+                  </p>
+                )}
+                <div className="delivery-grid">
+                  {pack.deliverables.poster && (
+                    <a className="delivery-poster" href={filmAssetUrl(movie.id, 'poster')} download>
+                      <img src={filmAssetUrl(movie.id, 'poster')} alt={`Poster for ${movie.title}`} loading="lazy" />
+                      <span>Poster</span>
+                    </a>
+                  )}
+                  <div className="delivery-links">
+                    <a href={filmAssetUrl(movie.id, 'script')} download>Reading script (.md)</a>
+                    <a href={filmAssetUrl(movie.id, 'shotlist')} download>Shot list (.csv)</a>
+                    <a href={filmAssetUrl(movie.id, 'subtitles')} download>Subtitles (.srt)</a>
+                    <a href={filmUrl(movie.id)} download>Film (.mp4)</a>
+                    {!pack.deliverables.poster && (
+                      <button type="button" className="text-action" onClick={() => void makePoster()} disabled={posterBusy}>
+                        {posterBusy ? <><Loader2 size={15} className="spin" /> Making key art…</> : <><Sparkles size={15} /> Make a poster (1 use)</>}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {!isActive(movie.status) && movie.status !== 'queued' && ordered.length > 0 && (
               <div className="director-advice">
