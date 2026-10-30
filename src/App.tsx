@@ -44,6 +44,7 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [toast, setToast] = useState('')
+  const [filmCount, setFilmCount] = useState<number | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
 
   useEffect(() => {
@@ -123,8 +124,8 @@ export default function App() {
         <nav className="desktop-nav" aria-label="Primary navigation">
           <a href="#studio">Create</a>
           <a href="#explore">Collection</a>
-          <a href="#films">Films</a>
-          <a href="#my-films">My films <span>{projects.length.toString().padStart(2, '0')}</span></a>
+          <a href="#films">Films <span>{filmCount === null ? '—' : filmCount.toString().padStart(2, '0')}</span></a>
+          <a href="#my-films">Drafts <span>{projects.length.toString().padStart(2, '0')}</span></a>
         </nav>
         <div className="header-actions">
           <span className="local-status"><i /> FILM STUDIO ONLINE</span>
@@ -139,8 +140,8 @@ export default function App() {
         <nav className="mobile-nav" id="mobile-navigation" aria-label="Mobile navigation">
           <a href="#studio" onClick={closeMobile}>Create <span>01</span></a>
           <a href="#explore" onClick={closeMobile}>Collection <span>02</span></a>
-          <a href="#films" onClick={closeMobile}>Films <span>03</span></a>
-          <a href="#my-films" onClick={closeMobile}>My films <span>{projects.length.toString().padStart(2, '0')}</span></a>
+          <a href="#films" onClick={closeMobile}>Films <span>{filmCount === null ? '—' : filmCount.toString().padStart(2, '0')}</span></a>
+          <a href="#my-films" onClick={closeMobile}>Drafts <span>{projects.length.toString().padStart(2, '0')}</span></a>
           <p>Ideas in. Cinema out.</p>
         </nav>
       )}
@@ -149,7 +150,7 @@ export default function App() {
         <Hero onStart={scrollToStudio} />
         <Studio key={studioSession} seed={studioSeed} onSave={saveProject} notify={notify} />
         <Suspense fallback={<SectionFallback label="director" />}>
-          <Director notify={notify} />
+          <Director notify={notify} onFilms={setFilmCount} />
         </Suspense>
         <Suspense fallback={<SectionFallback label="collection" />}>
           <Explore onSelect={setSelectedFilm} />

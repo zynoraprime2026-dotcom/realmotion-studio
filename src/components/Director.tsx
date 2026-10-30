@@ -26,11 +26,13 @@ const isActive = (status: string) => ACTIVE_MOVIE_STATUSES.includes(status)
 
 type DirectorProps = {
   notify: (message: string) => void
+  /** The nav shows how many films this deployment has actually made. */
+  onFilms?: (count: number) => void
 }
 
 type Stage = 'write' | 'review' | 'film'
 
-export function Director({ notify }: DirectorProps) {
+export function Director({ notify, onFilms }: DirectorProps) {
   const [stage, setStage] = useState<Stage>('write')
   const [prompt, setPrompt] = useState(examplePrompt)
   const [ratio, setRatio] = useState<'16:9' | '9:16'>('16:9')
@@ -44,20 +46,23 @@ export function Director({ notify }: DirectorProps) {
   const [suggestions, setSuggestions] = useState<MovieSuggestion[]>([])
   const [workingScene, setWorkingScene] = useState<number | null>(null)
   const [library, setLibrary] = useState<MovieSummary[]>([])
+  const [libraryError, setLibraryError] = useState('')
 
   const refreshLibrary = useCallback(() => {
     listMovies()
-      .then((rows) => setLibrary(rows))
-      .catch(() => setLibrary([]))
+      .then((rows) => { setLibrary(rows); setLibraryError('') })
+      .catch((e: unknown) => setLibraryError(e instanceof Error ? e.message : 'Could not reach the studio API.'))
   }, [])
 
   useEffect(() => {
     let alive = true
     listMovies()
-      .then((rows) => { if (alive) setLibrary(rows) })
-      .catch(() => { if (alive) setLibrary([]) })
+      .then((rows) => { if (alive) { setLibrary(rows); setLibraryError('') } })
+      .catch((e: unknown) => { if (alive) setLibraryError(e instanceof Error ? e.message : 'Could not reach the studio API.') })
     return () => { alive = false }
   }, [])
+
+  useEffect(() => { onFilms?.(library.length) }, [library.length, onFilms])
 
   // one poll per status change: a finished film stops the loop on its own
   const movieId = movie?.id
@@ -87,6 +92,11 @@ export function Director({ notify }: DirectorProps) {
     setError('')
     setSuggestions([])
     setMovie({ id: summary.id, title: summary.title, status: summary.status, progress: summary.progress ?? 0, step: null, error: null, assemblyStale: false, continuity: 'chained', scenes: [] })
+    if (!isActive(summary.status)) {
+      getMovieSuggestions(summary.id)
+        .then((advice) => setSuggestions(advice.suggestions))
+        .catch(() => setSuggestions([]))
+    }
   }
 
   const writeDraft = async () => {
@@ -218,7 +228,8 @@ export function Director({ notify }: DirectorProps) {
 
             <aside className="director-library">
               <p className="field-label">MADE ON THIS DEPLOYMENT</p>
-              {library.length === 0 && <p className="director-empty">No films yet. The first one you approve will appear here with its cut.</p>}
+              {libraryError && <p className="director-error" role="alert">The film list could not be loaded: {libraryError}</p>}
+              {!libraryError && library.length === 0 && <p className="director-empty">No films yet. The first one you approve will appear here with its cut.</p>}
               <ul>
                 {library.map((entry) => (
                   <li key={entry.id}>
