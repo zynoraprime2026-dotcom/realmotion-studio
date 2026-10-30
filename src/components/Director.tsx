@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Clapperboard, Crop, Film, Loader2, RefreshCw, Scissors, Sparkles, Wand2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Aperture, Check, Clapperboard, Crop, Film, Loader2, Music, Plus, RefreshCw, Scissors, Sparkles, Sun, Users, Wand2, X } from 'lucide-react'
 import {
   ACTIVE_MOVIE_STATUSES,
   assembleMovie,
@@ -86,6 +86,9 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const [bibleBusy, setBibleBusy] = useState(false)
   const [bibleIdeas, setBibleIdeas] = useState<SeriesSuggestion[]>([])
   const [suggestBusy, setSuggestBusy] = useState(false)
+  const [openIdeas, setOpenIdeas] = useState<string[]>([])
+  const [justAdded, setJustAdded] = useState<{ label: string; before: string } | null>(null)
+  const bibleRef = useRef<HTMLTextAreaElement | null>(null)
 
   const refreshLibrary = useCallback(() => {
     listMovies()
@@ -220,10 +223,49 @@ export function Director({ notify, onFilms }: DirectorProps) {
     }
   }
 
+  // A tap has to leave a trace: the line lands, the field scrolls to it, and
+  // the change is undoable. Otherwise the card just vanishes and the user is
+  // left wondering whether anything happened.
   const acceptSuggestion = (suggestion: SeriesSuggestion) => {
+    const before = bibleText
     setBibleText((current) => (current.trim() ? `${current.trim()}\n\n${suggestion.text}` : suggestion.text))
     setBibleIdeas((current) => current.filter((entry) => entry.text !== suggestion.text))
+    setJustAdded({ label: suggestion.label || 'line', before })
+    requestAnimationFrame(() => {
+      const field = bibleRef.current
+      if (field) field.scrollTop = field.scrollHeight
+    })
   }
+
+  const undoAdd = () => {
+    if (!justAdded) return
+    setBibleText(justAdded.before)
+    setJustAdded(null)
+  }
+
+  const skipIdea = (suggestion: SeriesSuggestion) => {
+    setBibleIdeas((current) => current.filter((entry) => entry.text !== suggestion.text))
+  }
+
+  const toggleIdea = (text: string) => {
+    setOpenIdeas((current) => (current.includes(text) ? current.filter((entry) => entry !== text) : [...current, text]))
+  }
+
+  /** The icon that tells the eye what a suggestion is about before reading it. */
+  const ideaIcon = (label: string) => {
+    const word = label.toLowerCase()
+    if (/cast|charact|people|face/.test(word)) return Users
+    if (/light|palette|colou?r|look|tone/.test(word)) return Sun
+    if (/camera|lens|frame|shot|movement/.test(word)) return Aperture
+    if (/sound|music|voice|score|silence/.test(word)) return Music
+    return Sparkles
+  }
+
+  useEffect(() => {
+    if (!justAdded) return
+    const timer = window.setTimeout(() => setJustAdded(null), 8000)
+    return () => window.clearTimeout(timer)
+  }, [justAdded])
 
   const saveBible = async () => {
     if (bibleName.trim().length < 2) {
@@ -472,22 +514,57 @@ export function Director({ notify, onFilms }: DirectorProps) {
                 {bibleOpen && (
                   <div className="series-form">
                     <input className="series-input" placeholder="Series name" value={bibleName} onChange={(event) => setBibleName(event.target.value)} aria-label="Series name" />
-                    <textarea className="series-input" rows={3} placeholder="The look, the cast, the rules those films must obey" value={bibleText} onChange={(event) => setBibleText(event.target.value)} aria-label="Series bible" />
+                    <textarea ref={bibleRef} className="series-input series-bible" rows={3} placeholder="The look, the cast, the rules those films must obey" value={bibleText} onChange={(event) => setBibleText(event.target.value)} aria-label="Series bible" />
                     <button type="button" className="text-action" onClick={() => void askForSuggestions()} disabled={suggestBusy} aria-live="polite">
                       {suggestBusy ? 'Reading your bible…' : bibleIdeas.length ? 'Suggest something else' : 'AI suggestions · free'}
                     </button>
+                    <p className="suggestion-free">Free. Ask again as often as you like.</p>
                     {bibleIdeas.length > 0 && (
                       <ul className="suggestion-list">
-                        {bibleIdeas.map((suggestion) => (
-                          <li key={suggestion.text}>
-                            <button type="button" className="suggestion-card" onClick={() => acceptSuggestion(suggestion)}>
-                              <span className="suggestion-label">{suggestion.label}</span>
-                              <span className="suggestion-text">{suggestion.text}</span>
-                              <span className="suggestion-add">Tap to add</span>
-                            </button>
-                          </li>
-                        ))}
+                        {bibleIdeas.map((suggestion) => {
+                          const Icon = ideaIcon(suggestion.label)
+                          const open = openIdeas.includes(suggestion.text)
+                          return (
+                            <li key={suggestion.text} className="suggestion-item">
+                              <div className="suggestion-card">
+                                <div className="suggestion-head">
+                                  <span className="suggestion-label">
+                                    <Icon size={13} strokeWidth={1.8} aria-hidden="true" />
+                                    {suggestion.label || 'Suggestion'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="suggestion-dismiss"
+                                    onClick={() => skipIdea(suggestion)}
+                                    aria-label={`Skip the ${suggestion.label || 'suggested'} line`}
+                                  >
+                                    <X size={14} strokeWidth={1.8} aria-hidden="true" />
+                                  </button>
+                                </div>
+                                <p className={open ? 'suggestion-text is-open' : 'suggestion-text'}>{suggestion.text}</p>
+                                <div className="suggestion-foot">
+                                  {suggestion.text.length > 120 && (
+                                    <button type="button" className="suggestion-more" onClick={() => toggleIdea(suggestion.text)} aria-expanded={open}>
+                                      {open ? 'Show less' : 'Show all'}
+                                    </button>
+                                  )}
+                                  <button type="button" className="suggestion-add" onClick={() => acceptSuggestion(suggestion)}>
+                                    <Plus size={14} strokeWidth={2} aria-hidden="true" />
+                                    Add to bible
+                                  </button>
+                                </div>
+                              </div>
+                            </li>
+                          )
+                        })}
                       </ul>
+                    )}
+                    {justAdded && (
+                      <p className="suggestion-added" role="status">
+                        <Check size={14} strokeWidth={2} aria-hidden="true" />
+                        Added the {justAdded.label.toLowerCase()} line
+                        <button type="button" className="suggestion-undo" onClick={undoAdd}>Undo</button>
+                      </p>
                     )}
                     <button type="button" className="chip" onClick={() => void saveBible()} disabled={bibleBusy}>
                       {bibleBusy ? 'Saving…' : 'Save series'}
