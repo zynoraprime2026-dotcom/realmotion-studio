@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   animateScene,
   createMovieFromDraft,
+  cutTrailer,
+  cutVertical,
   draftMovie,
   filmUrl,
   generateContent,
@@ -171,5 +173,29 @@ describe('director mode calls', () => {
 
   it('streams the finished film through the proxy, because a video tag can only GET', () => {
     expect(filmUrl('mov_abc12345')).toBe('/api/studio?action=movie&movie_id=mov_abc12345')
+  })
+})
+
+
+describe('the render tier', () => {
+  it('travels with the create call so the studio knows what was paid for', async () => {
+    const post = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ movie_id: 'mov_1', status: 'queued' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    await createMovieFromDraft('drf_abcdefgh-1', [{ visualPrompt: 'a dhow at dawn', narrationText: "Ali: We sail now.", duration: 5 }], 'Monsoon Dhow', 'high')
+    const body = JSON.parse(String((post.mock.calls[0]?.[1] as RequestInit).body))
+    expect(body.quality).toBe('high')
+  })
+})
+
+describe('re-cuts', () => {
+  it('asks for a vertical cut and a trailer by movie id', async () => {
+    const post = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(JSON.stringify({ url: '/v1/movie/mov_1/vertical' }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    await cutVertical('mov_1')
+    await cutTrailer('mov_1')
+    expect(JSON.parse(String((post.mock.calls[0]?.[1] as RequestInit).body)).action).toBe('movie-vertical')
+    expect(JSON.parse(String((post.mock.calls[1]?.[1] as RequestInit).body)).action).toBe('movie-trailer')
   })
 })

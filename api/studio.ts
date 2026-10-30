@@ -33,6 +33,8 @@ const ALLOWED_ACTIONS = [
   'movie-cast',
   'movie-package',
   'movie-poster',
+  'movie-vertical',
+  'movie-trailer',
 ] as const
 type StudioAction = (typeof ALLOWED_ACTIONS)[number]
 
@@ -46,6 +48,8 @@ const METERED_ACTIONS: StudioAction[] = [
   'movie-reshoot',
   'movie-assemble',
   'movie-poster',
+  'movie-vertical',
+  'movie-trailer',
 ]
 
 const MIN_DIMENSION = 256
@@ -86,7 +90,10 @@ export function upstreamPath(action: StudioAction, payload: Record<string, strin
     case 'movie-cast':
     case 'movie-package':
     case 'movie-poster':
+    case 'movie-trailer':
       return `/v1/movie/${movieId}/${action.replace(/^movie-/g, '').replace('status', '')}`.replace(/\/$/, '')
+    case 'movie-vertical':
+      return `/v1/movie/${movieId}/re-cut`
     case 'movie-list':
       return '/v1/movie/list'
     case 'image':
@@ -188,6 +195,12 @@ export function validateProxyBody(body: unknown): Validated {
         duration: Math.min(10, Math.max(3, Math.round(Number(one.duration) || 5))),
       }
     })
+    const QUALITIES = ['storyboard', 'standard', 'high']
+    const quality = readString(raw.quality)
+    if (quality) {
+      if (!QUALITIES.includes(quality)) return { error: `Unsupported quality "${quality}". Use one of: ${QUALITIES.join(', ')}.` }
+      payload.quality = quality
+    }
     return { action: 'movie-create', payload: payload as Record<string, string | number> }
   }
 
@@ -199,7 +212,7 @@ export function validateProxyBody(body: unknown): Validated {
     return { action, payload: { movie_id: movieId } }
   }
 
-  if (action === 'movie-poster') {
+  if (action === 'movie-vertical' || action === 'movie-trailer' || action === 'movie-poster') {
     const movieId = readString(raw.movie_id)
     if (!MOVIE_ID.test(movieId)) return { error: 'Send the movie_id returned when the film started.' }
     return { action, payload: { movie_id: movieId } }
@@ -302,6 +315,8 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
         shotlist: { path: `/v1/movie/${movieId}/script?format=csv`, type: 'text/csv; charset=utf-8', name: 'shotlist.csv' },
         subtitles: { path: `/v1/movie/${movieId}/subtitles?format=srt`, type: 'text/plain; charset=utf-8', name: 'subtitles.srt' },
         poster: { path: `/v1/movie/${movieId}/poster`, type: 'image/jpeg', name: 'poster.jpg' },
+        vertical: { path: `/v1/movie/${movieId}/vertical`, type: 'video/mp4', name: 'vertical.mp4' },
+        trailer: { path: `/v1/movie/${movieId}/trailer`, type: 'video/mp4', name: 'trailer.mp4' },
       }
       const spec = ASSETS[asset]
       if (!spec) return res.status(400).json({ error: 'Unknown deliverable.' })
