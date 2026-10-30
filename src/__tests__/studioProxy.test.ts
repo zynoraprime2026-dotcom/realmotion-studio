@@ -111,3 +111,18 @@ describe('validateProxyBody: the deliverable package', () => {
     expect(upstreamPath('movie-poster', { movie_id: id })).toBe(`/v1/movie/${id}/poster`)
   })
 })
+
+
+describe('validateProxyBody: the re-cuts', () => {
+  const id = 'mov_1234abcd-0000-1111-2222-333344445555'
+
+  it('accepts a vertical re-cut and a trailer for a real film', () => {
+    expect(validateProxyBody({ action: 'movie-vertical', movie_id: id })).toEqual({ action: 'movie-vertical', payload: { movie_id: id } })
+    expect(validateProxyBody({ action: 'movie-trailer', movie_id: id })).toEqual({ action: 'movie-trailer', payload: { movie_id: id } })
+  })
+
+  it('sends the vertical cut to the re-cut route, not a /vertical POST', () => {
+    expect(upstreamPath('movie-vertical', { movie_id: id })).toBe(`/v1/movie/${id}/re-cut`)
+    expect(upstreamPath('movie-trailer', { movie_id: id })).toBe(`/v1/movie/${id}/trailer`)
+  })
+})

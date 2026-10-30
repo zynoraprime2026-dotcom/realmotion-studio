@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Clapperboard, Loader2, RefreshCw, Scissors, Sparkles, Wand2 } from 'lucide-react'
+import { Clapperboard, Crop, Film, Loader2, RefreshCw, Scissors, Sparkles, Wand2 } from 'lucide-react'
 import {
   ACTIVE_MOVIE_STATUSES,
   assembleMovie,
   createMovieFromDraft,
+  cutTrailer,
+  cutVertical,
   draftMovie,
   filmAssetUrl,
   filmUrl,
@@ -14,6 +16,7 @@ import {
   listMovies,
   reshootScene,
   type FilmPackage,
+  type FilmQuality,
   type MovieDraft,
   type MovieDraftScene,
   type MovieStatus,
@@ -53,6 +56,11 @@ export function Director({ notify, onFilms }: DirectorProps) {
   const [libraryError, setLibraryError] = useState('')
   const [pack, setPack] = useState<FilmPackage | null>(null)
   const [posterBusy, setPosterBusy] = useState(false)
+  const [quality, setQuality] = useState<FilmQuality>(() => {
+    const saved = localStorage.getItem('studio.quality')
+    return saved === 'storyboard' || saved === 'high' ? saved : 'standard'
+  })
+  const [cutBusy, setCutBusy] = useState<'vertical' | 'trailer' | null>(null)
 
   const refreshLibrary = useCallback(() => {
     listMovies()
@@ -77,6 +85,21 @@ export function Director({ notify, onFilms }: DirectorProps) {
     getFilmPackage(movie.id).then((p) => { if (alive) setPack(p) }).catch(() => { if (alive) setPack(null) })
     return () => { alive = false }
   }, [movie])
+
+  const makeCut = async (kind: 'vertical' | 'trailer') => {
+    if (!movie) return
+    setCutBusy(kind)
+    try {
+      if (kind === 'vertical') await cutVertical(movie.id)
+      else await cutTrailer(movie.id)
+      setPack(await getFilmPackage(movie.id))
+      notify(kind === 'vertical' ? 'Vertical cut ready to download.' : 'Trailer ready to download.')
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'That cut could not be made.')
+    } finally {
+      setCutBusy(null)
+    }
+  }
 
   const makePoster = async () => {
     if (!movie) return
@@ -161,10 +184,12 @@ export function Director({ notify, onFilms }: DirectorProps) {
     setError('')
     setBusy(true)
     try {
+      localStorage.setItem('studio.quality', quality)
       const created = await createMovieFromDraft(
         draft.draft_id,
         shots.map((shot) => ({ visualPrompt: shot.visualPrompt, narrationText: shot.narrationText, duration: shot.duration })),
         title.trim() || draft.title,
+        quality,
       )
       setStage('film')
       setMovie({ id: created.movie_id, title: title.trim() || draft.title, status: 'queued', progress: 0, step: null, error: null, assemblyStale: false, continuity: created.continuity ?? 'chained', scenes: [] })
@@ -309,6 +334,25 @@ export function Director({ notify, onFilms }: DirectorProps) {
 
             {error && <p className="director-error" role="alert">{error}</p>}
             <div className="director-actions">
+              <div className="quality-row" role="radiogroup" aria-label="Render quality">
+                {([
+                  { key: 'storyboard', label: 'Storyboard', note: 'stills only · cheapest' },
+                  { key: 'standard', label: 'Standard', note: '5s shots' },
+                  { key: 'high', label: 'High', note: '10s shots · costs most' },
+                ] as { key: FilmQuality; label: string; note: string }[]).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={quality === opt.key}
+                    className={`quality-option${quality === opt.key ? ' is-on' : ''}`}
+                    onClick={() => setQuality(opt.key)}
+                  >
+                    <strong>{opt.label}</strong>
+                    <span>{opt.note}</span>
+                  </button>
+                ))}
+              </div>
               <p className="director-note">RENDER: STILLS → CHAINED SHOTS → VOICE → MUSIC → SUBTITLES → CUT</p>
               <button type="button" className="director-button" onClick={renderFilm} disabled={busy}>
                 {busy ? <><Loader2 size={17} className="spin" /> Starting…</> : <><Clapperboard size={17} /> Render this film</>}
@@ -368,6 +412,20 @@ export function Director({ notify, onFilms }: DirectorProps) {
                     <a href={filmAssetUrl(movie.id, 'shotlist')} download>Shot list (.csv)</a>
                     <a href={filmAssetUrl(movie.id, 'subtitles')} download>Subtitles (.srt)</a>
                     <a href={filmUrl(movie.id)} download>Film (.mp4)</a>
+                    {pack.deliverables.vertical ? (
+                      <a href={filmAssetUrl(movie.id, 'vertical')} download>Vertical 9:16 (.mp4)</a>
+                    ) : (
+                      <button type="button" className="text-action" onClick={() => void makeCut('vertical')} disabled={cutBusy !== null}>
+                        {cutBusy === 'vertical' ? <><Loader2 size={15} className="spin" /> Cropping to 9:16…</> : <><Crop size={15} /> Cut a 9:16 version (1 use)</>}
+                      </button>
+                    )}
+                    {pack.deliverables.trailer ? (
+                      <a href={filmAssetUrl(movie.id, 'trailer')} download>Trailer (.mp4)</a>
+                    ) : (
+                      <button type="button" className="text-action" onClick={() => void makeCut('trailer')} disabled={cutBusy !== null}>
+                        {cutBusy === 'trailer' ? <><Loader2 size={15} className="spin" /> Cutting the trailer…</> : <><Film size={15} /> Cut a trailer (1 use)</>}
+                      </button>
+                    )}
                     {!pack.deliverables.poster && (
                       <button type="button" className="text-action" onClick={() => void makePoster()} disabled={posterBusy}>
                         {posterBusy ? <><Loader2 size={15} className="spin" /> Making key art…</> : <><Sparkles size={15} /> Make a poster (1 use)</>}

@@ -202,15 +202,19 @@ export async function draftMovie(input: DraftMovieInput): Promise<MovieDraft> {
 }
 
 /** Renders the shot list a person has just reviewed. Nothing renders before this. */
+export type FilmQuality = 'storyboard' | 'standard' | 'high'
+
 export async function createMovieFromDraft(
   draftId: string,
   scenes: Pick<MovieDraftScene, 'visualPrompt' | 'narrationText' | 'duration'>[],
   title?: string,
+  quality?: FilmQuality,
 ): Promise<CreateMovieResponse> {
   return post<CreateMovieResponse>({
     action: 'movie-create',
     draft_id: draftId,
     title,
+    quality,
     scenes: scenes.map((scene) => ({
       visualPrompt: scene.visualPrompt.trim(),
       narrationText: scene.narrationText.trim(),
@@ -284,7 +288,17 @@ export async function generateFilmPoster(movieId: string): Promise<{ poster: str
   return post<{ poster: string }>({ action: 'movie-poster', movie_id: movieId })
 }
 
-export type FilmAsset = 'script' | 'shotlist' | 'subtitles' | 'poster'
+export type FilmAsset = 'script' | 'shotlist' | 'subtitles' | 'poster' | 'vertical' | 'trailer'
+
+/** A 9:16 master for socials, cut from the finished film. */
+export async function cutVertical(movieId: string): Promise<{ url: string }> {
+  return post<{ url: string }>({ action: 'movie-vertical', movie_id: movieId })
+}
+
+/** A trailer cut from the middle of the film's best shots. */
+export async function cutTrailer(movieId: string): Promise<{ url: string; seconds: number }> {
+  return post<{ url: string; seconds: number }>({ action: 'movie-trailer', movie_id: movieId })
+}
 
 export function filmAssetUrl(movieId: string, asset: FilmAsset): string {
   return `/api/studio?action=movie-asset&movie_id=${encodeURIComponent(movieId)}&asset=${asset}`
