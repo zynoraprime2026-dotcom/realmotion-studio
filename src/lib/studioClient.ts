@@ -162,6 +162,11 @@ export type FilmSeries = { id: string; name: string; bible: string; prompt?: str
 /** One thing the bible is missing, written so it can be accepted in a tap. */
 export type SeriesSuggestion = { label: string; text: string }
 
+/** Finish a film that failed on something outside it. Free: it was paid for. */
+export async function retryMovie(movieId: string): Promise<{ status: string; cost?: string }> {
+  return post<{ status: string; cost?: string }>({ action: 'movie-retry', movie_id: movieId })
+}
+
 export async function getUsage(): Promise<StudioUsage> {
   return post<StudioUsage>({ action: 'usage' })
 }
