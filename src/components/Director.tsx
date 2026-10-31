@@ -9,6 +9,7 @@ import {
   cutVertical,
   getUsage,
   listSeries,
+  retryMovie,
   suggestSeries,
   updateSeries,
   draftMovie,
@@ -317,6 +318,22 @@ export function Director({ notify, onFilms }: DirectorProps) {
       setError(e instanceof Error ? e.message : 'That series could not be saved.')
     } finally {
       setBibleBusy(false)
+    }
+  }
+
+  // A film that failed on a provider's quota can be finished without paying again
+  const finishFilm = async () => {
+    if (!movie) return
+    setError('')
+    setBusy(true)
+    try {
+      await retryMovie(movie.id)
+      setMovie({ ...movie, status: 'queued', progress: 0, error: null })
+      notify('Finishing the film. Nothing will be charged for it.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That film could not be restarted.')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -634,6 +651,11 @@ export function Director({ notify, onFilms }: DirectorProps) {
                 </p>
               </div>
               <div className="director-head-actions">
+                {(movie.status === 'failed' || movie.status === 'partial') && (
+                  <button type="button" className="chip" onClick={() => void finishFilm()} disabled={busy}>
+                    Finish this film · free
+                  </button>
+                )}
                 <button type="button" className="text-action" onClick={() => { setStage('write'); void refreshLibrary() }}>All films</button>
                 <button type="button" className="text-action" onClick={startOver}>New film</button>
               </div>

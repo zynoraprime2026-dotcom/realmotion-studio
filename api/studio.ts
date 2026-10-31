@@ -35,6 +35,7 @@ const ALLOWED_ACTIONS = [
   'movie-poster',
   'movie-vertical',
   'movie-trailer',
+  'movie-retry',
   'usage',
   'series-list',
   'series-create',
@@ -100,6 +101,8 @@ export function upstreamPath(action: StudioAction, payload: Record<string, strin
       return `/v1/movie/${movieId}/${action.replace(/^movie-/g, '').replace('status', '')}`.replace(/\/$/, '')
     case 'movie-vertical':
       return `/v1/movie/${movieId}/re-cut`
+    case 'movie-retry':
+      return `/v1/movie/${movieId}/retry`
     case 'movie-list':
       return '/v1/movie/list'
     case 'usage':
@@ -266,6 +269,12 @@ export function validateProxyBody(body: unknown): Validated {
   if (action === 'movie-vertical' || action === 'movie-trailer' || action === 'movie-poster') {
     const movieId = readString(raw.movie_id)
     if (!MOVIE_ID.test(movieId)) return { error: 'Send the movie_id returned when the film started.' }
+    return { action, payload: { movie_id: movieId } }
+  }
+
+  if (action === 'movie-retry') {
+    const movieId = readString(raw.movie_id)
+    if (!MOVIE_ID.test(movieId)) return { error: 'Send the movie_id of the film to finish.' }
     return { action, payload: { movie_id: movieId } }
   }
 
